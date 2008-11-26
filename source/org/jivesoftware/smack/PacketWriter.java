@@ -42,7 +42,7 @@ class PacketWriter {
     private Thread writerThread;
     private Thread keepAliveThread;
     private Writer writer;
-    private XMPPConnection connection;
+    private AbstractConnection connection;
     private final BlockingQueue<Packet> queue;
     private boolean done;
     
@@ -68,7 +68,7 @@ class PacketWriter {
      *
      * @param connection the connection.
      */
-    protected PacketWriter(XMPPConnection connection) {
+    protected PacketWriter(AbstractConnection connection) {
         this.queue = new ArrayBlockingQueue<Packet>(500, true);
         this.connection = connection;
         init();
@@ -345,6 +345,10 @@ class PacketWriter {
         StringBuilder stream = new StringBuilder();
         stream.append("<stream:stream");
         stream.append(" to=\"").append(connection.serviceName).append("\"");
+        // If the connection is a Link-local connection, a 'from' attribute
+        // shoud be added.
+       if (connection instanceof XMPPLLConnection) 
+           stream.append(" from=\"").append(connection.getUser()).append("\"");
         stream.append(" xmlns=\"jabber:client\"");
         stream.append(" xmlns:stream=\"http://etherx.jabber.org/streams\"");
         stream.append(" version=\"1.0\">");

@@ -56,6 +56,7 @@
     <property name="javadoc.dest.dir" value="${basedir}/target/javadoc" />
     <property name="merge.lib.dir" value="${basedir}/build/merge" />
     <property name="test.dir" value="${basedir}/test" />
+    <property name="test-mdns.dir" value="${basedir}/test-mdns" />
     <property name="resources.dir" value="${basedir}/build/resources" />
 	<property name="jingle.extension.merge.lib.dir" value="${basedir}/jingle/extension/build/merge" />	
 	<property name="jingle.extension.lib.dir" value="${basedir}/jingle/extension/build/lib" />	
@@ -106,6 +107,9 @@
                 <fileset dir="${merge.lib.dir}">
                     <include name="*.jar"/>
                 </fileset>
+                <fileset dir="${basedir}/build">
+                    <include name="jmdns.jar"/>
+                </fileset>
             </classpath>
         </javac>		
 		<mkdir dir="${compile.dir}/jingle/extension" />
@@ -148,6 +152,35 @@
             <classpath>
                 <fileset dir="${merge.lib.dir}">
                     <include name="*.jar"/>
+                </fileset>
+                <fileset dir="${basedir}/build">
+                    <include name="junit.jar"/>
+                    <include name="xmlunit.jar"/>
+                </fileset>
+                <pathelement location="${compile.dir}" />
+            </classpath>
+        </javac>
+    </target>
+
+    <!-- compile-test-mdns -->
+    <!-- ======================================================================================= -->
+    <target name="compile-test-mdns" description="Compiles all source to ${compile.dir}.">
+        <!-- make target dir -->
+        <mkdir dir="${compile.test.dir}" />
+        <javac
+            destdir="${compile.test.dir}"
+            includeAntRuntime="no"
+            debug="on"
+            source="1.5"
+            target="1.5"
+        >
+            <src path="${test-mdns.dir}" />
+            <classpath>
+                <fileset dir="${merge.lib.dir}">
+                    <include name="*.jar"/>
+                </fileset>
+                <fileset dir="${basedir}/build">
+                    <include name="jmdns.jar"/>
                 </fileset>
                 <fileset dir="${basedir}/build">
                     <include name="junit.jar"/>
@@ -296,7 +329,7 @@
                 <fileset dir="${merge.lib.dir}">
                     <include name="*.jar"/>
                 </fileset>
-                <fileset dir="${basedir}">
+		<fileset dir="${basedir}/target">
                     <include name="smack-test.jar"/>
                 </fileset>
                 <pathelement location="${compile.dir}" />

@@ -49,7 +49,7 @@ public class PacketCollector {
 
     private PacketFilter packetFilter;
     private LinkedList<Packet> resultQueue;
-    private PacketReader packetReader;
+    private AbstractPacketReader packetReader;
     private boolean cancelled = false;
 
     /**
@@ -59,7 +59,7 @@ public class PacketCollector {
      * @param packetReader the packetReader the collector is tied to.
      * @param packetFilter determines which packets will be returned by this collector.
      */
-    protected PacketCollector(PacketReader packetReader, PacketFilter packetFilter) {
+    protected PacketCollector(AbstractPacketReader packetReader, PacketFilter packetFilter) {
         this.packetReader = packetReader;
         this.packetFilter = packetFilter;
         this.resultQueue = new LinkedList<Packet>();
