@@ -83,6 +83,7 @@ public class LLPresence {
 
     public List<Tuple<String, String>> toList() {
         LinkedList<Tuple<String, String>> list = new LinkedList<Tuple<String, String>>();
+        list.add(new Tuple<String,String>("txtvers", "1"));
         list.add(new Tuple<String,String>("1st", firstName));
         list.add(new Tuple<String,String>("last", lastName));
         list.add(new Tuple<String,String>("email", email));
