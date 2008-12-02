@@ -192,8 +192,10 @@ public class XMPPLLConnection extends AbstractConnection // public for debugging
             shutdown();
         } else {
             packetWriter = new PacketWriter(this);
-            if (debugger.getWriterListener() != null) {
-                packetWriter.addPacketListener(debugger.getWriterListener(), null);
+            if (debugger != null) {
+                if (debugger.getWriterListener() != null) {
+                    packetWriter.addPacketListener(debugger.getWriterListener(), null);
+                }
             }
             packetWriter.startup();
             notifyLLListenersConnected();
@@ -254,7 +256,7 @@ public class XMPPLLConnection extends AbstractConnection // public for debugging
             // If debugging is enabled, we should start the thread that will listen for
             // all packets and then log them.
             // XXX FIXME
-            if (true) {//configuration.isDebuggerEnabled()) {
+            if (false) {//configuration.isDebuggerEnabled()) {
                 packetReader.addPacketListener(debugger.getReaderListener(), null);
             }
 
@@ -332,7 +334,7 @@ public class XMPPLLConnection extends AbstractConnection // public for debugging
         }
 
         // If debugging is enabled, we open a window and write out all network traffic.
-        if (true) {//configuration.isDebuggerEnabled()) {
+        if (false) {//configuration.isDebuggerEnabled()) {
             if (debugger == null) {
                 // Detect the debugger class to use.
                 String className = null;
