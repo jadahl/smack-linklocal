@@ -1,7 +1,7 @@
 package org.jivesoftware.smackx;
 
 import org.jivesoftware.smack.XMPPException;
-import org.jivesoftware.smack.LLConnectionListener;
+import org.jivesoftware.smack.LLServiceConnectionListener;
 import org.jivesoftware.smack.XMPPLLConnection;
 import org.jivesoftware.smack.LLService;
 import org.jivesoftware.smackx.packet.DiscoverInfo;
@@ -24,17 +24,22 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author Jonas Ådahl
  */
 public class LLServiceDiscoveryManager {
-    private static Map<String, NodeInformationProvider> nodeInformationProviders =
-            new ConcurrentHashMap<String, NodeInformationProvider>();
-    private static final List<String> features = new ArrayList<String>();
+    private Map<String, NodeInformationProvider> nodeInformationProviders;
+    private final List<String> features;
     private LLService service;
 
-    static {
+    /*static {
         XMPPLLConnection.addLLConnectionListener(new ConnectionServiceMaintainer());
-    }
+    }*/
 
     public LLServiceDiscoveryManager(LLService service) {
         this.service = service;
+
+        nodeInformationProviders = 
+            new ConcurrentHashMap<String,NodeInformationProvider>();
+        features = new ArrayList<String>();
+
+        service.addLLServiceConnectionListener(new ConnectionServiceMaintainer());
     }
 
     /**
@@ -302,11 +307,12 @@ public class LLServiceDiscoveryManager {
      * and push the service discovery procedure until the new connection is
      * established.
      */
-    private static class ConnectionServiceMaintainer implements LLConnectionListener {
+    private class ConnectionServiceMaintainer implements LLServiceConnectionListener {
 
         public void connectionCreated(XMPPLLConnection connection) {
+            // Add service discovery for Link-local connections.\
             ServiceDiscoveryManager manager =
-                ServiceDiscoveryManager.getInstanceFor(connection);
+                new ServiceDiscoveryManager(connection);
 
             // set node information providers
             for (Map.Entry<String,NodeInformationProvider> entry :

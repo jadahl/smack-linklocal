@@ -15,6 +15,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.io.IOException;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.Map;
 import java.util.LinkedList;
@@ -58,19 +59,31 @@ public abstract class LLService {
     private boolean done = false;
     private Thread listenerThread;
 
-    private Map<String,LLChat> chats = new ConcurrentHashMap<String,LLChat>();
+    private Map<String,LLChat> chats =
+        new ConcurrentHashMap<String,LLChat>();
 
-    private Map<String,XMPPLLConnection> ingoing = new ConcurrentHashMap<String,XMPPLLConnection>();
-    private Map<String,XMPPLLConnection> outgoing = new ConcurrentHashMap<String,XMPPLLConnection>();
+    private Map<String,XMPPLLConnection> ingoing =
+        new ConcurrentHashMap<String,XMPPLLConnection>();
+    private Map<String,XMPPLLConnection> outgoing =
+        new ConcurrentHashMap<String,XMPPLLConnection>();
 
     // Listeners for state updates, such as LLService closed down
-    private Set<LLServiceStateListener> stateListeners = new CopyOnWriteArraySet<LLServiceStateListener>();
+    private Set<LLServiceStateListener> stateListeners =
+        new CopyOnWriteArraySet<LLServiceStateListener>();
+
+    // Listeners for XMPPLLConnections associated with this service
+    private Set<LLServiceConnectionListener> llServiceConnectionListeners =
+        new CopyOnWriteArraySet<LLServiceConnectionListener>();
 
     // Presence discoverer, notifies of changes in presences on the network.
     private LLPresenceDiscoverer presenceDiscoverer;
 
     // chat listeners gets notified when new chats are created
     private Set<LLChatListener> chatListeners = new CopyOnWriteArraySet<LLChatListener>();
+
+    // Set of associated connections.
+    private Set<XMPPLLConnection> associatedConnections =
+        new HashSet<XMPPLLConnection>();
 
     private ServerSocket socket;
 
@@ -102,23 +115,33 @@ public abstract class LLService {
 
         XMPPLLConnection.addLLConnectionListener(new LLConnectionListener() {
             public void connectionCreated(XMPPLLConnection connection) {
-                if (connection.isInitiator()) {
-                    addOutgoingConnection(connection);
-                }
-                else {
-                    addIngoingConnection(connection);
-                }
-                connection.addConnectionListener(new ConnectionActivityListener(connection));
-                // add message listener. filter logic:
-                // type = msg ^ (msg.type = chat v msg.type = normal v msg.type = error)
-                connection.addPacketListener(new MessageListener(service),
-                    new AndFilter(
-                        new PacketTypeFilter(Message.class),
-                        new OrFilter(
-                            new MessageTypeFilter(Message.Type.chat),
+                // We only care about this connection if we were the one
+                // creating it
+                if (isAssociatedConnection(connection)) {
+                    if (connection.isInitiator()) {
+                        addOutgoingConnection(connection);
+                    }
+                    else {
+                        addIngoingConnection(connection);
+                    }
+
+                    connection.addConnectionListener(new ConnectionActivityListener(connection));
+
+                    // Notify listeners that a new connection associated with this
+                    // service has been created.
+                    notifyNewServiceConnection(connection);
+
+                    // add message listener. filter logic:
+                    // type = msg ^ (msg.type = chat v msg.type = normal v msg.type = error)
+                    connection.addPacketListener(new MessageListener(service),
+                        new AndFilter(
+                            new PacketTypeFilter(Message.class),
                             new OrFilter(
-                                new MessageTypeFilter(Message.Type.normal),
-                                new MessageTypeFilter(Message.Type.error)))));
+                                new MessageTypeFilter(Message.Type.chat),
+                                new OrFilter(
+                                    new MessageTypeFilter(Message.Type.normal),
+                                    new MessageTypeFilter(Message.Type.error)))));
+                }
             }
         });
 
@@ -227,6 +250,9 @@ public abstract class LLService {
                     new LLConnectionConfiguration(presence, s);
                 XMPPLLConnection connection = new XMPPLLConnection(this, config);
 
+                // Associate the new connection with this service
+                addAssociatedConnection(connection);
+
                 // Spawn new thread to handle the connecting.
                 // The reason for spawning a new thread is to let two remote clients
                 // be able to connect at the same time.
@@ -268,6 +294,56 @@ public abstract class LLService {
             listener.unknownOriginMessage(message);
         }
     }
+
+    /**
+     * Adds a listener that are notified when a new link-local connection
+     * has been established.
+     *
+     * @param listener A class implementing the LLConnectionListener interface.
+     */
+    public void addLLServiceConnectionListener(LLServiceConnectionListener listener) {
+        llServiceConnectionListeners.add(listener);
+    }
+
+    /**
+     * Removes a listener from the new connection listener list.
+     *
+     * @param listener The class implementing the LLConnectionListener interface that
+     * is to be removed.
+     */
+    public void removeLLServiceConnectionListener(LLServiceConnectionListener listener) {
+        llServiceConnectionListeners.remove(listener);
+    }
+
+    private void notifyNewServiceConnection(XMPPLLConnection connection) {
+        for (LLServiceConnectionListener listener : llServiceConnectionListeners) {
+            listener.connectionCreated(connection);
+        }
+    }
+
+    /**
+     * XXX document.
+     */
+    private void addAssociatedConnection(XMPPLLConnection connection) {
+        synchronized (associatedConnections) {
+            associatedConnections.add(connection);
+        }
+    }
+
+    /**
+     * XXX document.
+     */
+    private void removeAssociatedConnection(XMPPLLConnection connection) {
+        synchronized (associatedConnections) {
+            associatedConnections.remove(connection);
+        }
+    }
+
+    private boolean isAssociatedConnection(XMPPLLConnection connection) {
+        synchronized (associatedConnections) {
+            return associatedConnections.contains(connection);
+        }
+    } 
 
     /**
      * Add service state listener.
@@ -431,6 +507,8 @@ public abstract class LLService {
         LLConnectionConfiguration config =
             new LLConnectionConfiguration(presence, remotePresence);
         connection = new XMPPLLConnection(this, config);
+        // Associate the new connection with this service
+        addAssociatedConnection(connection);
         connection.connect();
         addOutgoingConnection(connection);
 
@@ -506,6 +584,8 @@ public abstract class LLService {
                 removeOutgoingConnection(connection);
             else
                 removeIngoingConnection(connection);
+
+            removeAssociatedConnection(connection);
         }
     }
 

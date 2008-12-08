@@ -28,6 +28,7 @@ import org.jivesoftware.smack.filter.PacketIDFilter;
 import org.jivesoftware.smack.filter.PacketTypeFilter;
 import org.jivesoftware.smack.packet.IQ;
 import org.jivesoftware.smack.packet.Packet;
+import org.jivesoftware.smack.packet.Presence;
 import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smackx.packet.DiscoverInfo;
 import org.jivesoftware.smackx.packet.DiscoverItems;
@@ -55,6 +56,7 @@ public class ServiceDiscoveryManager {
     private static Map<AbstractConnection, ServiceDiscoveryManager> instances =
             new ConcurrentHashMap<AbstractConnection, ServiceDiscoveryManager>();
 
+    private boolean recalculateVersion = true;
     private AbstractConnection connection;
     private final List<String> features = new ArrayList<String>();
     private DataForm extendedInfo = null;
@@ -63,13 +65,6 @@ public class ServiceDiscoveryManager {
 
     // Create a new ServiceDiscoveryManager on every established connection
     static {
-        // Add service discovery for Link-local connections.\
-        XMPPLLConnection.addLLConnectionListener(new LLConnectionListener() {
-            public void connectionCreated(XMPPLLConnection connection) {
-                new ServiceDiscoveryManager(connection);
-            }
-        });
-
         // Add service discovery for normal XMPP c2s connections
         XMPPConnection.addConnectionCreationListener(new ConnectionCreationListener() {
             public void connectionCreated(XMPPConnection connection) {
@@ -177,6 +172,17 @@ public class ServiceDiscoveryManager {
                 // ignore
             }
         });
+
+        // Intercept presence packages and add caps data when inteded.
+        PacketFilter capsPacketFilter = new PacketTypeFilter(Presence.class);
+        PacketInterceptor packetInterceptor = new PacketInterceptor() {
+            public void interceptPacket(Packet packet) {
+                System.err.println("Intercept package");
+                Presence presence = (Presence) packet;
+                entityVersion();
+            }
+        };
+        connection.addPacketWriterInterceptor(packetInterceptor, capsPacketFilter);
 
         // Listen for disco#items requests and answer with an empty result        
         PacketFilter packetFilter = new PacketTypeFilter(DiscoverItems.class);
@@ -352,6 +358,7 @@ public class ServiceDiscoveryManager {
      * @param feature the feature to register as supported.
      */
     public void addFeature(String feature) {
+        recalculateVersion = true;
         synchronized (features) {
             features.add(feature);
         }
@@ -366,6 +373,7 @@ public class ServiceDiscoveryManager {
      * @param feature the feature to remove from the supported features.
      */
     public void removeFeature(String feature) {
+        recalculateVersion = true;
         synchronized (features) {
             features.remove(feature);
         }
@@ -399,7 +407,8 @@ public class ServiceDiscoveryManager {
      *            information.
      */
     public void setExtendedInfo(DataForm info) {
-      extendedInfo = info;
+        recalculateVersion = true;
+        extendedInfo = info;
     }
 
     /**
@@ -410,7 +419,8 @@ public class ServiceDiscoveryManager {
      * operation before logging to the server.
      */
     public void removeExtendedInfo() {
-       extendedInfo = null;
+        recalculateVersion = true;
+        extendedInfo = null;
     }
 
     /**
@@ -571,4 +581,75 @@ public class ServiceDiscoveryManager {
             throw new XMPPException(result.getError());
         }
     }
+
+    private String formFieldValuesToCaps(Iterator<String> i) {
+        String s = "";
+        SortedSet<String> fvs = new TreeSet<String>();
+        for (; i.hasNext();) {
+            fvs.add(i.next());
+        }
+        for (String fv : fvs) {
+            s += fv + "<";
+        }
+        return s;
+    }
+
+    public void entityVersion() {
+        recalculateVersion = false;
+        String s = "";
+
+        // Add identity
+        // FIXME version
+        s += "client/" + identityType + "//" + identityName + " alpha<";
+
+        // Add features
+        synchronized (features) {
+            SortedSet<String> fs = new TreeSet<String>();
+            for (String f : features) {
+                fs.add(f);
+            }
+
+            for (String f : fs) {
+                s += f + "<";
+            }
+        }
+
+        if (extendedInfo != null) {
+            synchronized (extendedInfo) {
+                SortedSet<FormField> fs = new TreeSet<FormField>(
+                        new Comparator<FormField>() {
+                            public int compare(FormField f1, FormField f2) {
+                                return f1.getVariable().compareTo(f2.getVariable());
+                            }
+                        });
+
+                FormField ft = null;
+
+                for (Iterator<FormField> i = extendedInfo.getFields(); i.hasNext();) {
+                    FormField f = i.next();
+                    if (!f.getVariable().equals("FORM_TYPE")) {
+                        fs.add(f);
+                    }
+                    else {
+                        ft = f;
+                    }
+                }
+
+                // Add FORM_TYPE values
+                if (ft != null) {
+                    s += formFieldValuesToCaps(ft.getValues());
+                }
+
+                // Add the other values
+                for (FormField f : fs) {
+                    s += f.getVariable() + "<";
+                    s += formFieldValuesToCaps(f.getValues());
+                }
+            }
+        }
+
+        // DEBUG
+        System.err.println("Version string unhashed: " + s);
+    }
+
 }

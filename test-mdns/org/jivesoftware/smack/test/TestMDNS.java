@@ -50,6 +50,10 @@ public class TestMDNS {
             System.out.println("Prepering link-local service discovery...");
             // As we want to play with service discovery, initiate the wrapper
             LLServiceDiscoveryManager disco = new LLServiceDiscoveryManager(service);
+            System.out.println("Adding three features to service discovery manager...");
+            disco.addFeature("http://www.jabber.org/extensions/lalal");
+            disco.addFeature("http://www.jabber.org/extenions/thetetteet");
+            disco.addFeature("urn:xmpp:hejhoppextension");
 
             // Start listen for Link-local chats
             service.addLLChatListener(new MyChatListener());
