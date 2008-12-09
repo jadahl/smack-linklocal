@@ -30,11 +30,15 @@ import org.jivesoftware.smack.packet.IQ;
 import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.packet.Presence;
 import org.jivesoftware.smack.packet.XMPPError;
+import org.jivesoftware.smack.util.Base64;
+import org.jivesoftware.smackx.packet.CapsExtension;
 import org.jivesoftware.smackx.packet.DiscoverInfo;
 import org.jivesoftware.smackx.packet.DiscoverItems;
 import org.jivesoftware.smackx.packet.DataForm;
 
 import java.util.*;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -52,6 +56,8 @@ public class ServiceDiscoveryManager {
 
     private static String identityName = "Smack";
     private static String identityType = "pc";
+    private static String entityNode = "http://www.igniterealtime.org/projects/smack/";
+
 
     private static Map<AbstractConnection, ServiceDiscoveryManager> instances =
             new ConcurrentHashMap<AbstractConnection, ServiceDiscoveryManager>();
@@ -177,9 +183,11 @@ public class ServiceDiscoveryManager {
         PacketFilter capsPacketFilter = new PacketTypeFilter(Presence.class);
         PacketInterceptor packetInterceptor = new PacketInterceptor() {
             public void interceptPacket(Packet packet) {
-                System.err.println("Intercept package");
-                Presence presence = (Presence) packet;
-                entityVersion();
+                if (recalculateVersion) {
+                    String ver = entityCapsVersion();
+                    CapsExtension caps = new CapsExtension(entityNode, ver, "sha-1");
+                    packet.addExtension(caps);
+                }
             }
         };
         connection.addPacketWriterInterceptor(packetInterceptor, capsPacketFilter);
@@ -582,7 +590,18 @@ public class ServiceDiscoveryManager {
         }
     }
 
-    private String formFieldValuesToCaps(Iterator<String> i) {
+    private static String capsToHash(String capsString) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-1");
+            byte[] digest = md.digest(capsString.getBytes());
+            return Base64.encodeBytes(digest);
+        }
+        catch (NoSuchAlgorithmException nsae) {
+            return null;
+        }
+    }
+
+    private static String formFieldValuesToCaps(Iterator<String> i) {
         String s = "";
         SortedSet<String> fvs = new TreeSet<String>();
         for (; i.hasNext();) {
@@ -594,7 +613,7 @@ public class ServiceDiscoveryManager {
         return s;
     }
 
-    public void entityVersion() {
+    public String entityCapsVersion() {
         recalculateVersion = false;
         String s = "";
 
@@ -648,8 +667,13 @@ public class ServiceDiscoveryManager {
             }
         }
 
-        // DEBUG
-        System.err.println("Version string unhashed: " + s);
+        return capsToHash(s);
+    }
+
+
+    public static void main(String[] argv) {
+        String h = ServiceDiscoveryManager.capsToHash("client/pc/el/Ψ 0.11<client/pc/en/Psi 0.11<http://jabber.org/protocol/caps<http://jabber.org/protocol/disco#info<http://jabber.org/protocol/disco#items<http://jabber.org/protocol/muc<urn:xmpp:dataforms:softwareinfo<ip_version<ipv4<ipv6<os<Mac<os_version<10.5.1<software<Psi<software_version<0.11<");
+        System.err.println("Caps hash: " + h);
     }
 
 }
