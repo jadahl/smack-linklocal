@@ -58,7 +58,7 @@ public abstract class AbstractConnection {
      * property <tt>smack.debugEnabled</tt> to true. The system property can be set on the
      * command line such as "java SomeApp -Dsmack.debugEnabled=true".
      */
-    public static boolean DEBUG_ENABLED = false;
+    public static boolean DEBUG_ENABLED = true;
 
     // Counter to uniquely identify connections that are created. This is distinct from the
     // connection ID, which is a value sent by the server once a connection is made.

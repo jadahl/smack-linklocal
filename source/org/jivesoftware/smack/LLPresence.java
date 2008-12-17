@@ -28,6 +28,8 @@ import java.util.LinkedList;
 public class LLPresence {
     // Service info, gathered from the TXT fields
     private String firstName, lastName, email, msg, nick, jid;
+    // caps version
+    private String hash, ver, node;
     // XEP-0174 specifies that if status is not specified it is equal to "avail".
     private Mode status = Mode.avail;
 
@@ -67,6 +69,12 @@ public class LLPresence {
                 setJID(t.b);
             else if (t.a.equals("nick"))
                 setNick(t.b);
+            else if (t.a.equals("hash"))
+                setHash(t.b);
+            else if (t.a.equals("node"))
+                setNode(t.b);
+            else if (t.a.equals("ver"))
+                setVer(t.b);
             else if (t.a.equals("status")) {
                 try {
                     setStatus(Mode.valueOf(t.b));
@@ -91,6 +99,9 @@ public class LLPresence {
         list.add(new Tuple<String,String>("nick", nick));
         list.add(new Tuple<String,String>("status", status.toString()));
         list.add(new Tuple<String,String>("msg", msg));
+        list.add(new Tuple<String,String>("hash", hash));
+        list.add(new Tuple<String,String>("node", node));
+        list.add(new Tuple<String,String>("ver", ver));
         list.add(new Tuple<String,String>("port.p2ppj", new Integer(port).toString()));
         return list;
     }
@@ -136,6 +147,18 @@ public class LLPresence {
         this.jid = jid;
     }
 
+    public void setHash(String hash) {
+        this.hash = hash;
+    }
+
+    public void setNode(String node) {
+        this.node = node;
+    }
+
+    public void setVer(String ver) {
+        this.ver = ver;
+    }
+
     void setPort(int port) {
         this.port = port;
     }
@@ -174,6 +197,18 @@ public class LLPresence {
 
     public String getHost() {
         return host;
+    }
+
+    public String getHash() {
+        return hash;
+    }
+
+    public String getNode() {
+        return node;
+    }
+
+    public String getVer() {
+        return ver;
     }
 
     public int getPort() {

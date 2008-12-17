@@ -42,7 +42,7 @@ public class JmDNSService extends LLService {
         JmDNSService service = new JmDNSService(presence, presenceDiscoverer);
 
         // Initiate the mDNS XMPP Service 
-        service.init();
+        //service.init();
 
         return service;
     }

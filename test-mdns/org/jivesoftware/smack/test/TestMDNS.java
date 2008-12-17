@@ -36,7 +36,7 @@ public class TestMDNS {
                 name = System.getenv("USERNAME") + "@" + java.net.InetAddress.getLocalHost().getHostName();
             } catch (Exception e) {}
 
-            System.out.println("Link-local presens name set to '" + name + "'");
+            System.out.println("Link-local presence name set to '" + name + "'");
             // Create a basic presence (only set name, and status to available)
             LLPresence presence = new LLPresence(name);
 
@@ -61,6 +61,8 @@ public class TestMDNS {
             // Add hook for doing a clean shut down
             Runtime.getRuntime().addShutdownHook(new CloseDownService(service));
 
+            // Initiate Link-local message session
+            service.init();
 
             // Implement a user friendly interface.
             String line;
@@ -74,8 +76,10 @@ public class TestMDNS {
                     line = stdIn.readLine();
                     if ("quit".equals(line))
                         done = true;
-                    else if ("spam".equals(line))
+                    else if ("spam".equals(line)) {
                         service.spam();
+                        ServiceDiscoveryManager.spam();
+                    }
                     else if ("msg".equals(line)) {
                         System.out.print("Enter user: ");
                         String user = stdIn.readLine();
@@ -84,6 +88,11 @@ public class TestMDNS {
                         LLChat chat = service.getChat(user);
                         chat.sendMessage(message);
                         System.out.println("Message sent.");
+                    }
+                    else if ("addfeature".equals(line)) {
+                        System.out.print("Enter new feature: ");
+                        String feature = stdIn.readLine();
+                        disco.addFeature(feature);
                     }
                     else if ("disco".equals(line)) {
                         System.out.print("Enter user: ");

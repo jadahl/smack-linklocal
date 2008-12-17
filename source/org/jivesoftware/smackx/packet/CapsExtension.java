@@ -5,8 +5,11 @@ import org.jivesoftware.smack.packet.PacketExtension;
 public class CapsExtension implements PacketExtension {
 
     private String node, version, hash;
-    private static final String XMLNS = "http://jabber.org/protocol/caps";
+    public static final String XMLNS = "http://jabber.org/protocol/caps";
+    public static final String NODE_NAME = "c";
 
+    public CapsExtension() {
+    }
 
     public CapsExtension(String node, String version, String hash) {
         this.node = node;
@@ -15,11 +18,35 @@ public class CapsExtension implements PacketExtension {
     }
 
     public String getElementName() {
-        return "s";
+        return NODE_NAME;
     }
 
     public String getNamespace() {
         return XMLNS;
+    }
+
+    public String getNode() {
+        return node;
+    }
+
+    public void setNode(String node) {
+        this.node = node;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
+    public void setVersion(String version) {
+        this.version = version;
+    }
+
+    public String getHash() {
+        return hash;
+    }
+
+    public void setHash(String hash) {
+        this.hash = hash;
     }
 
     /*<c xmlns='http://jabber.org/protocol/caps' 
@@ -28,7 +55,7 @@ public class CapsExtension implements PacketExtension {
      ver='QgayPKawpkPSDYmwT/WM94uAlu0='/>
      */
     public String toXML() {
-        String xml = "<s xmlns='" + XMLNS + "' " +
+        String xml = "<c xmlns='" + XMLNS + "' " +
             "hash='" + hash + "' " +
             "node='" + node + "' " +
             "ver='" + version + "'/>";

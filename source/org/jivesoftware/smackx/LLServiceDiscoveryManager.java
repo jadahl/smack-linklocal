@@ -4,8 +4,11 @@ import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.LLServiceConnectionListener;
 import org.jivesoftware.smack.XMPPLLConnection;
 import org.jivesoftware.smack.LLService;
+import org.jivesoftware.smack.LLPresence;
+import org.jivesoftware.smack.LLPresenceListener;
 import org.jivesoftware.smackx.packet.DiscoverInfo;
 import org.jivesoftware.smackx.packet.DiscoverItems;
+import org.jivesoftware.smackx.packet.DataForm;
 
 import java.util.Collections;
 import java.util.Map;
@@ -24,9 +27,14 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author Jonas Ådahl
  */
 public class LLServiceDiscoveryManager {
-    private Map<String, NodeInformationProvider> nodeInformationProviders;
-    private final List<String> features;
+    private Map<String, NodeInformationProvider> nodeInformationProviders =
+            new ConcurrentHashMap<String,NodeInformationProvider>();
+    private final List<String> features =
+        new ArrayList<String>();
+    private DataForm extendedInfo = null;
+
     private LLService service;
+    private EntityCapsManager capsManager;
 
     /*static {
         XMPPLLConnection.addLLConnectionListener(new ConnectionServiceMaintainer());
@@ -35,9 +43,31 @@ public class LLServiceDiscoveryManager {
     public LLServiceDiscoveryManager(LLService service) {
         this.service = service;
 
-        nodeInformationProviders = 
-            new ConcurrentHashMap<String,NodeInformationProvider>();
-        features = new ArrayList<String>();
+        capsManager = new EntityCapsManager();
+        capsManager.addCapsVerListener(new CapsPresenceRenewer());
+        capsManager.calculateEntityCapsVersion(
+                ServiceDiscoveryManager.getIdentityType(),
+                ServiceDiscoveryManager.getIdentityName(),
+                features, extendedInfo);
+
+        // Add presence listener. The presence listener will gather
+        // entity caps data
+        service.addPresenceListener(new LLPresenceListener() {
+            public void presenceNew(LLPresence presence) {
+                if (presence.getHash() != null &&
+                    presence.getNode() != null &&
+                    presence.getVer() != null) {
+                    // Add presence to caps manager
+                    capsManager.addUserCapsNode(presence.getServiceName(),
+                        presence.getNode() + "#" + presence.getVer());
+                }
+            }
+
+            public void presenceRemove(LLPresence presence) {
+
+            }
+        });
+
 
         service.addLLServiceConnectionListener(new ConnectionServiceMaintainer());
     }
@@ -110,6 +140,48 @@ public class LLServiceDiscoveryManager {
     }
 
     /**
+     * Registers extended discovery information of this XMPP entity. When this
+     * client is queried for its information this data form will be returned as
+     * specified by XEP-0128.
+     * <p>
+     *
+     * Since no packet is actually sent to the server it is safe to perform this
+     * operation before logging to the server. In fact, you may want to
+     * configure the extended info before logging to the server so that the
+     * information is already available if it is required upon login.
+     *
+     * @param info
+     *            the data form that contains the extend service discovery
+     *            information.
+     */
+    public void setExtendedInfo(DataForm info) {
+        extendedInfo = info;
+
+        // set for already active connections
+        for (XMPPLLConnection connection : service.getConnections())
+            ServiceDiscoveryManager.getInstanceFor(connection).setExtendedInfo(info);
+
+        renewEntityCapsVersion();
+    }
+
+    /**
+     * Removes the dataform containing extended service discovery information
+     * from the information returned by this XMPP entity.<p>
+     *
+     * Since no packet is actually sent to the server it is safe to perform this
+     * operation before logging to the server.
+     */
+    public void removeExtendedInfo() {
+        extendedInfo = null;
+
+        // remove for already active connections
+        for (XMPPLLConnection connection : service.getConnections())
+            ServiceDiscoveryManager.getInstanceFor(connection).removeExtendedInfo();
+
+        renewEntityCapsVersion();
+    }
+
+    /**
      * Returns the discovered information of a given XMPP entity addressed by its JID.
      * 
      * @param entityID the address of the XMPP entity.
@@ -117,7 +189,7 @@ public class LLServiceDiscoveryManager {
      * @throws XMPPException if the operation failed for some reason.
      */
     public DiscoverInfo discoverInfo(String serviceName) throws XMPPException {
-        return discoverInfo(serviceName, null);
+        return getInstance(serviceName).discoverInfo(serviceName);
     }
     /**
      * Returns the discovered information of a given XMPP entity addressed by its JID and
@@ -226,6 +298,8 @@ public class LLServiceDiscoveryManager {
         synchronized (features) {
             features.add(feature);
         }
+
+        renewEntityCapsVersion();
     }
 
     /**
@@ -243,6 +317,7 @@ public class LLServiceDiscoveryManager {
                 ServiceDiscoveryManager.getInstanceFor(connection).removeFeature(feature);
         }
 
+        renewEntityCapsVersion();
     }
 
     /**
@@ -302,6 +377,15 @@ public class LLServiceDiscoveryManager {
         getInstance(entityID).publishItems(entityID, node, discoverItems);
     }
 
+    private void renewEntityCapsVersion() {
+        if (capsManager != null) {
+            capsManager.calculateEntityCapsVersion(
+                    ServiceDiscoveryManager.getIdentityType(),
+                    ServiceDiscoveryManager.getIdentityName(),
+                    features, extendedInfo);
+        }
+    }
+
     /**
      * In case that a connection is unavailable we create a new connection
      * and push the service discovery procedure until the new connection is
@@ -314,7 +398,13 @@ public class LLServiceDiscoveryManager {
             ServiceDiscoveryManager manager =
                 new ServiceDiscoveryManager(connection);
 
-            // set node information providers
+            // Set Entity Capabilities Manager
+            manager.setEntityCapsManager(capsManager);
+
+            // Set extended info
+            manager.setExtendedInfo(extendedInfo);
+
+            // Set node information providers
             for (Map.Entry<String,NodeInformationProvider> entry :
                     nodeInformationProviders.entrySet()) {
                 manager.setNodeInformationProvider(entry.getKey(), entry.getValue());
@@ -324,6 +414,23 @@ public class LLServiceDiscoveryManager {
             synchronized (features) {
                 for (String feature : features) {
                     manager.addFeature(feature);
+                }
+            }
+        }
+    }
+
+    private class CapsPresenceRenewer implements CapsVerListener {
+        public void capsVerUpdated(String ver) {
+            synchronized (service) {
+                try {
+                    LLPresence presence = service.getLocalPresence();
+                    presence.setHash(EntityCapsManager.HASH_METHOD);
+                    presence.setNode(capsManager.getNode());
+                    presence.setVer(ver);
+                    service.updatePresence(presence);
+                }
+                catch (XMPPException xe) {
+                    // ignore
                 }
             }
         }

@@ -8,7 +8,7 @@ public class MDNSListener implements LLPresenceListener {
     public void presenceNew(LLPresence pr) {
         try {
             System.out.println("New presence: " + pr.getServiceName() + 
-                    " (" + pr.getStatus() + ")");
+                    " (" + pr.getStatus() + "), ver=" + pr.getVer());
         } catch (Exception e) {
             System.err.println(e);
             e.printStackTrace();

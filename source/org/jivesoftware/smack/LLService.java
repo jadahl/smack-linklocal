@@ -59,6 +59,8 @@ public abstract class LLService {
     private boolean done = false;
     private Thread listenerThread;
 
+    private boolean initiated = false;
+
     private Map<String,LLChat> chats =
         new ConcurrentHashMap<String,LLChat>();
 
@@ -181,7 +183,7 @@ public abstract class LLService {
      */
     protected abstract void updateText();
 
-    protected void init() throws XMPPException {
+    public void init() throws XMPPException {
         // allocate a new port for remote clients to connect to
         socket = bindRange(DEFAULT_MIN_PORT, DEFAULT_MAX_PORT);
         presence.setPort(socket.getLocalPort());
@@ -205,6 +207,8 @@ public abstract class LLService {
         listenerThread.setName("Smack Link-local Service Listener");
         listenerThread.setDaemon(true);
         listenerThread.start();
+
+        initiated = true;
     }
 
     public void close() {
@@ -546,8 +550,18 @@ public abstract class LLService {
      */
     public void updatePresence(LLPresence presence) throws XMPPException {
         this.presence.update(presence);
-        updateText();
-        reannounceService();
+
+        if (initiated) {
+            updateText();
+            reannounceService();
+        }
+    }
+
+    /**
+     * Get current Link-local presence.
+     */
+    public LLPresence getLocalPresence() {
+        return presence;
     }
 
     /**

@@ -89,6 +89,7 @@ public class XMPPConnection extends AbstractConnection {
      * Flag that indicates if the user is currently authenticated with the server.
      */
     private boolean authenticated = false;
+
     /**
      * Flag that indicates if the user was authenticated with the server when the connection
      * to the server was closed (abruptly or not).
@@ -118,6 +119,22 @@ public class XMPPConnection extends AbstractConnection {
     private ConnectionConfiguration configuration;
     private ChatManager chatManager;
 
+    static {
+        // Use try block since we may not have permission to get a system
+        // property (for example, when an applet).
+        try {
+            DEBUG_ENABLED = Boolean.getBoolean("smack.debugEnabled");
+        }
+        catch (Exception e) {
+            // Ignore.
+        }
+        // Ensure the SmackConfiguration class is loaded by calling a method in it.
+        //
+        // FIXME loading the class here makes the updated ServiceDiscoveryManager load
+        // before XMPPLLConnection, causing a NullPointerException when adding
+        // link-local connection creation listener.
+        SmackConfiguration.getVersion();
+    }
 
     /**
      * Creates a new connection to the specified XMPP server. A DNS SRV lookup will be
@@ -812,7 +829,9 @@ public class XMPPConnection extends AbstractConnection {
         }
 
         // If debugging is enabled, we open a window and write out all network traffic.
-        if (configuration.isDebuggerEnabled()) {
+        System.err.println("Debugging enabled? " + configuration.isDebuggerEnabled());
+        //if (configuration.isDebuggerEnabled()) {
+        if (true) {
             if (debugger == null) {
                 // Detect the debugger class to use.
                 String className = null;
@@ -902,6 +921,17 @@ public class XMPPConnection extends AbstractConnection {
      */
     protected ConnectionConfiguration getConfiguration() {
         return configuration;
+    }
+
+    /**
+     * Returns true if a presence automatically will be sent upon a successful
+     * login.
+     *
+     * @return true if a presence will be sent upon a successful login or false
+     * if not.
+     */
+    public boolean isSendPresence() {
+        return configuration.isSendPresence();
     }
 
     /**

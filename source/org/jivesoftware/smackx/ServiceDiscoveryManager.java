@@ -40,6 +40,7 @@ import java.util.*;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 /**
  * Manages discovery of services in XMPP entities. This class provides:
@@ -58,11 +59,14 @@ public class ServiceDiscoveryManager {
     private static String identityType = "pc";
     private static String entityNode = "http://www.igniterealtime.org/projects/smack/";
 
+    private String currentCapsVersion = null;
+    private boolean sendPresence = false;
+
+    private EntityCapsManager capsManager;
 
     private static Map<AbstractConnection, ServiceDiscoveryManager> instances =
             new ConcurrentHashMap<AbstractConnection, ServiceDiscoveryManager>();
 
-    private boolean recalculateVersion = true;
     private AbstractConnection connection;
     private final List<String> features = new ArrayList<String>();
     private DataForm extendedInfo = null;
@@ -88,6 +92,15 @@ public class ServiceDiscoveryManager {
      */
     public ServiceDiscoveryManager(AbstractConnection connection) {
         this.connection = connection;
+
+        // For every XMPPConnection, add one EntityCapsManager.
+        if (connection instanceof XMPPConnection) {
+            setEntityCapsManager(new EntityCapsManager());
+            capsManager.addCapsVerListener(new CapsPresenceRenewer());
+        }
+
+        renewEntityCapsVersion();
+
         init();
     }
 
@@ -180,12 +193,14 @@ public class ServiceDiscoveryManager {
         });
 
         // Intercept presence packages and add caps data when inteded.
+        // XEP-0115 specifies that a client SHOULD include entity capabilities
+        // with every presence notification it sends.
         PacketFilter capsPacketFilter = new PacketTypeFilter(Presence.class);
         PacketInterceptor packetInterceptor = new PacketInterceptor() {
             public void interceptPacket(Packet packet) {
-                if (recalculateVersion) {
-                    String ver = entityCapsVersion();
-                    CapsExtension caps = new CapsExtension(entityNode, ver, "sha-1");
+                if (capsManager != null) {
+                    String ver = getEntityCapsVersion();
+                    CapsExtension caps = new CapsExtension(capsManager.getNode(), ver, "sha-1");
                     packet.addExtension(caps);
                 }
             }
@@ -242,8 +257,12 @@ public class ServiceDiscoveryManager {
                     response.setTo(discoverInfo.getFrom());
                     response.setPacketID(discoverInfo.getPacketID());
                     response.setNode(discoverInfo.getNode());
-                     // Add the client's identity and features only if "node" is null
-                    if (discoverInfo.getNode() == null) {
+                    // Add the client's identity and features if "node" is
+                    // null or our entity caps version.
+                    if (discoverInfo.getNode() == null || 
+                            (capsManager == null? true :
+                             (capsManager.getNode() + "#" +
+                              getEntityCapsVersion()).equals(discoverInfo.getNode()))) {
                         // Set this client identity
                         DiscoverInfo.Identity identity = new DiscoverInfo.Identity("client",
                                 getIdentityName());
@@ -251,6 +270,9 @@ public class ServiceDiscoveryManager {
                         response.addIdentity(identity);
                         // Add the registered features to the response
                         synchronized (features) {
+                            // Add Entity Capabilities (XEP-0115) feature node.
+                            response.addFeature("http://jabber.org/protocol/caps");
+
                             for (Iterator<String> it = getFeatures(); it.hasNext();) {
                                 response.addFeature(it.next());
                             }
@@ -366,9 +388,9 @@ public class ServiceDiscoveryManager {
      * @param feature the feature to register as supported.
      */
     public void addFeature(String feature) {
-        recalculateVersion = true;
         synchronized (features) {
             features.add(feature);
+            renewEntityCapsVersion();
         }
     }
 
@@ -381,9 +403,9 @@ public class ServiceDiscoveryManager {
      * @param feature the feature to remove from the supported features.
      */
     public void removeFeature(String feature) {
-        recalculateVersion = true;
         synchronized (features) {
             features.remove(feature);
+            renewEntityCapsVersion();
         }
     }
 
@@ -415,8 +437,8 @@ public class ServiceDiscoveryManager {
      *            information.
      */
     public void setExtendedInfo(DataForm info) {
-        recalculateVersion = true;
         extendedInfo = info;
+        renewEntityCapsVersion();
     }
 
     /**
@@ -427,8 +449,8 @@ public class ServiceDiscoveryManager {
      * operation before logging to the server.
      */
     public void removeExtendedInfo() {
-        recalculateVersion = true;
         extendedInfo = null;
+        renewEntityCapsVersion();
     }
 
     /**
@@ -439,7 +461,33 @@ public class ServiceDiscoveryManager {
      * @throws XMPPException if the operation failed for some reason.
      */
     public DiscoverInfo discoverInfo(String entityID) throws XMPPException {
-        return discoverInfo(entityID, null);
+        // Check if the have it cached in the Entity Capabilities Manager
+        DiscoverInfo info = capsManager.getDiscoverInfoByUser(entityID);
+
+
+        // If there is no cached information retrieve new one
+        if (info == null) {
+            // Discover by requesting from the remote client
+            info = discoverInfo(entityID, null);
+
+            // Store the result in the cache
+            if (capsManager != null) {
+                // Get the newest node#version
+                String nodeVersion = capsManager.getNodeVersionByUser(entityID);
+
+                // If a version is known, update the record
+                if (nodeVersion != null) {
+                    capsManager.addDiscoverInfoByNode(nodeVersion, info);
+                }
+            }
+
+            return info;
+        }
+        else {
+            DiscoverInfo newInfo = cloneDiscoverInfo(info);
+            newInfo.setFrom(entityID);
+            return newInfo;
+        }
     }
 
     /**
@@ -475,6 +523,7 @@ public class ServiceDiscoveryManager {
         if (result.getType() == IQ.Type.ERROR) {
             throw new XMPPException(result.getError());
         }
+
         return (DiscoverInfo) result;
     }
 
@@ -590,90 +639,67 @@ public class ServiceDiscoveryManager {
         }
     }
 
-    private static String capsToHash(String capsString) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-1");
-            byte[] digest = md.digest(capsString.getBytes());
-            return Base64.encodeBytes(digest);
+    private DiscoverInfo cloneDiscoverInfo(DiscoverInfo disco) {
+        return disco.clone();
+    }
+
+    /**
+     * Entity Capabilities
+     */
+
+    public void setEntityCapsManager(EntityCapsManager manager) {
+        capsManager = manager;
+        capsManager.addPacketListener(connection);
+    }
+
+
+    private void renewEntityCapsVersion() {
+        // If a XMPPConnection is the managed one, see that the new
+        // version is updated
+        if (connection instanceof XMPPConnection) {
+            if (capsManager != null) {
+                capsManager.calculateEntityCapsVersion(
+                        identityType, identityName, features, extendedInfo);
+                //capsManager.notifyCapsVerListeners();
+            }
         }
-        catch (NoSuchAlgorithmException nsae) {
+    }
+
+    private String getEntityCapsVersion() {
+        if (capsManager != null) {
+            return capsManager.getCapsVersion();
+        }
+        else {
             return null;
         }
     }
 
-    private static String formFieldValuesToCaps(Iterator<String> i) {
-        String s = "";
-        SortedSet<String> fvs = new TreeSet<String>();
-        for (; i.hasNext();) {
-            fvs.add(i.next());
-        }
-        for (String fv : fvs) {
-            s += fv + "<";
-        }
-        return s;
+    private void setSendPresence() {
+        sendPresence = true;
     }
 
-    public String entityCapsVersion() {
-        recalculateVersion = false;
-        String s = "";
-
-        // Add identity
-        // FIXME version
-        s += "client/" + identityType + "//" + identityName + " alpha<";
-
-        // Add features
-        synchronized (features) {
-            SortedSet<String> fs = new TreeSet<String>();
-            for (String f : features) {
-                fs.add(f);
-            }
-
-            for (String f : fs) {
-                s += f + "<";
-            }
-        }
-
-        if (extendedInfo != null) {
-            synchronized (extendedInfo) {
-                SortedSet<FormField> fs = new TreeSet<FormField>(
-                        new Comparator<FormField>() {
-                            public int compare(FormField f1, FormField f2) {
-                                return f1.getVariable().compareTo(f2.getVariable());
-                            }
-                        });
-
-                FormField ft = null;
-
-                for (Iterator<FormField> i = extendedInfo.getFields(); i.hasNext();) {
-                    FormField f = i.next();
-                    if (!f.getVariable().equals("FORM_TYPE")) {
-                        fs.add(f);
-                    }
-                    else {
-                        ft = f;
-                    }
-                }
-
-                // Add FORM_TYPE values
-                if (ft != null) {
-                    s += formFieldValuesToCaps(ft.getValues());
-                }
-
-                // Add the other values
-                for (FormField f : fs) {
-                    s += f.getVariable() + "<";
-                    s += formFieldValuesToCaps(f.getValues());
-                }
-            }
-        }
-
-        return capsToHash(s);
+    private boolean isSendPresence() {
+        return sendPresence;
     }
 
 
-    public static void main(String[] argv) {
-        String h = ServiceDiscoveryManager.capsToHash("client/pc/el/Ψ 0.11<client/pc/en/Psi 0.11<http://jabber.org/protocol/caps<http://jabber.org/protocol/disco#info<http://jabber.org/protocol/disco#items<http://jabber.org/protocol/muc<urn:xmpp:dataforms:softwareinfo<ip_version<ipv4<ipv6<os<Mac<os_version<10.5.1<software<Psi<software_version<0.11<");
-        System.err.println("Caps hash: " + h);
+    private class CapsPresenceRenewer implements CapsVerListener {
+        public void capsVerUpdated(String ver) {
+            // Send an empty presence, and let the packet interceptor
+            // add a <c/> node to it.
+            if (((XMPPConnection)connection).isAuthenticated() &&
+                    (((XMPPConnection)connection).isSendPresence() ||
+                     isSendPresence())) {
+                Presence presence = new Presence(Presence.Type.available);
+                connection.sendPacket(presence);
+            }
+        }
     }
 
+
+    public static void spam() {
+        for (ServiceDiscoveryManager m : instances.values()) {
+            m.capsManager.spam();
+        }
+    }
 }

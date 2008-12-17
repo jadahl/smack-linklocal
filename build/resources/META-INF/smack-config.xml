@@ -4,7 +4,8 @@
 
     <!-- Classes that will be loaded when Smack starts -->
     <startupClasses>
-        <className>org.jivesoftware.smack.XMPPLLConnection</className>        
+        <className>org.jivesoftware.smack.XMPPConnection</className>        
+        <className>org.jivesoftware.smackx.EntityCapsManager</className>
         <className>org.jivesoftware.smackx.ServiceDiscoveryManager</className>
         <className>org.jivesoftware.smack.PrivacyListManager</className>        
         <className>org.jivesoftware.smackx.XHTMLManager</className>
