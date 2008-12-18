@@ -77,6 +77,10 @@ public abstract class LLService {
     private Set<LLServiceConnectionListener> llServiceConnectionListeners =
         new CopyOnWriteArraySet<LLServiceConnectionListener>();
 
+    // Listeners for packets coming from this Link-local service
+    private final Map<PacketListener, ListenerWrapper> listeners =
+            new ConcurrentHashMap<PacketListener, ListenerWrapper>();
+
     // Presence discoverer, notifies of changes in presences on the network.
     private LLPresenceDiscoverer presenceDiscoverer;
 
@@ -143,6 +147,12 @@ public abstract class LLService {
                                 new OrFilter(
                                     new MessageTypeFilter(Message.Type.normal),
                                     new MessageTypeFilter(Message.Type.error)))));
+
+                    // add other existing packet filters associated with this service
+                    for (ListenerWrapper wrapper : listeners.values()) {
+                        connection.addPacketListener(wrapper.getPacketListener(),
+                                wrapper.getPacketFilter());
+                    }
                 }
             }
         });
@@ -348,6 +358,42 @@ public abstract class LLService {
             return associatedConnections.contains(connection);
         }
     } 
+
+    /**
+     * Add a packet listener.
+     *
+     * @param listener the PacketListener
+     * @param filter the Filter
+     */
+    public void addPacketListener(PacketListener listener, PacketFilter filter) {
+        ListenerWrapper wrapper = new ListenerWrapper(listener, filter);
+        listeners.put(listener, wrapper);
+
+        // Also add to existing connections
+        synchronized (ingoing) {
+            synchronized (outgoing) {
+                for (XMPPLLConnection c : getConnections()) {
+                    c.addPacketListener(listener, filter);
+                }
+            }
+        }
+    }
+
+    /** 
+     * Remove a packet listener.
+     */
+    public void removePacketListener(PacketListener listener) {
+        listeners.remove(listener);
+
+        // Also add to existing connections
+        synchronized (ingoing) {
+            synchronized (outgoing) {
+                for (XMPPLLConnection c : getConnections()) {
+                    c.removePacketListener(listener);
+                }
+            }
+        }
+    }
 
     /**
      * Add service state listener.
@@ -655,6 +701,34 @@ public abstract class LLService {
                 // ignore, since its an incoming connection
                 // there is nothing to save
             }
+        }
+    }
+
+    /**
+     * A wrapper class to associate a packet filter with a listener.
+     */
+    private static class ListenerWrapper {
+
+        private PacketListener packetListener;
+        private PacketFilter packetFilter;
+
+        public ListenerWrapper(PacketListener packetListener, PacketFilter packetFilter) {
+            this.packetListener = packetListener;
+            this.packetFilter = packetFilter;
+        }
+       
+        public void notifyListener(Packet packet) {
+            if (packetFilter == null || packetFilter.accept(packet)) {
+                packetListener.processPacket(packet);
+            }
+        }
+
+        public PacketListener getPacketListener() {
+            return packetListener;
+        }
+
+        public PacketFilter getPacketFilter() {
+            return packetFilter;
         }
     }
 }
