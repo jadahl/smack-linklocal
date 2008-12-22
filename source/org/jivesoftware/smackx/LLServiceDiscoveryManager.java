@@ -189,8 +189,16 @@ public class LLServiceDiscoveryManager {
      * @throws XMPPException if the operation failed for some reason.
      */
     public DiscoverInfo discoverInfo(String serviceName) throws XMPPException {
-        return getInstance(serviceName).discoverInfo(serviceName);
+        DiscoverInfo info = capsManager.getDiscoverInfoByUser(serviceName);
+
+        // If there is no cached information retrieve new one
+        if (info == null) {
+            info = getInstance(serviceName).discoverInfo(serviceName);
+        }
+
+        return info;
     }
+
     /**
      * Returns the discovered information of a given XMPP entity addressed by its JID and
      * note attribute. Use this message only when trying to query information which is not 

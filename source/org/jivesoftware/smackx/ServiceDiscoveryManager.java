@@ -467,18 +467,21 @@ public class ServiceDiscoveryManager {
 
         // If there is no cached information retrieve new one
         if (info == null) {
-            // Discover by requesting from the remote client
-            info = discoverInfo(entityID, null);
+            // If the caps node is known, use it in the request.
+            String node = null;
 
-            // Store the result in the cache
             if (capsManager != null) {
                 // Get the newest node#version
-                String nodeVersion = capsManager.getNodeVersionByUser(entityID);
+                node = capsManager.getNodeVersionByUser(entityID);
 
-                // If a version is known, update the record
-                if (nodeVersion != null) {
-                    capsManager.addDiscoverInfoByNode(nodeVersion, info);
-                }
+            }
+
+            // Discover by requesting from the remote client
+            info = discoverInfo(entityID, node);
+
+            // If the node version is known, store the new entry.
+            if (node != null && capsManager != null) {
+                capsManager.addDiscoverInfoByNode(node, info);
             }
 
             return info;

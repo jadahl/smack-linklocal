@@ -3,10 +3,12 @@ package org.jivesoftware.smack;
 
 import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.packet.Packet;
+import org.jivesoftware.smack.packet.IQ;
 import org.jivesoftware.smack.packet.Message;
 import org.jivesoftware.smack.filter.PacketFilter;
 import org.jivesoftware.smack.filter.AndFilter;
 import org.jivesoftware.smack.filter.OrFilter;
+import org.jivesoftware.smack.filter.PacketIDFilter;
 import org.jivesoftware.smack.filter.PacketTypeFilter;
 import org.jivesoftware.smack.filter.MessageTypeFilter;
 
@@ -584,6 +586,31 @@ public abstract class LLService {
      */
     void sendPacket(Packet packet) throws XMPPException {
         getConnection(packet.getTo()).sendPacket(packet);
+    }
+
+    /**
+     * Send an IQ set or get and get the respons.
+     */
+    public IQ getIQResponse(IQ request) throws XMPPException {
+        XMPPLLConnection connection = getConnection(request.getTo());
+
+        // Create a packet collector to listen for a response.
+        PacketCollector collector = connection.createPacketCollector(
+                new PacketIDFilter(request.getPacketID()));
+
+        connection.sendPacket(request);
+
+        // Wait up to 5 seconds for a result.
+        IQ result = (IQ) collector.nextResult(
+                SmackConfiguration.getPacketReplyTimeout());
+
+        // Stop queuing results
+        collector.cancel();
+        if (result == null) {
+            throw new XMPPException("No response from the remove host.");
+        }
+
+        return result;
     }
 
     /**
