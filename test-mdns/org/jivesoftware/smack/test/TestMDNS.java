@@ -49,7 +49,13 @@ public class TestMDNS {
 
             System.out.println("Prepering link-local service discovery...");
             // As we want to play with service discovery, initiate the wrapper
-            LLServiceDiscoveryManager disco = new LLServiceDiscoveryManager(service);
+            LLServiceDiscoveryManager disco = LLServiceDiscoveryManager.getInstanceFor(service);
+
+            if (disco == null) {
+                System.err.println("Failed to initiated Service Discovery Manager.");
+                System.exit(1);
+            }
+
             System.out.println("Adding three features to service discovery manager...");
             disco.addFeature("http://www.jabber.org/extensions/lalal");
             disco.addFeature("http://www.jabber.org/extenions/thetetteet");

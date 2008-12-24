@@ -11,6 +11,7 @@ import org.jivesoftware.smack.filter.OrFilter;
 import org.jivesoftware.smack.filter.PacketIDFilter;
 import org.jivesoftware.smack.filter.PacketTypeFilter;
 import org.jivesoftware.smack.filter.MessageTypeFilter;
+import org.jivesoftware.smack.filter.IQTypeFilter;
 
 
 import java.net.ServerSocket;
@@ -53,6 +54,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public abstract class LLService {
     private LLService service = null;
 
+    // Listeners for new services
+    private static Set<LLServiceListener> serviceCreatedListeners =
+        new CopyOnWriteArraySet<LLServiceListener>();
+
     static final int DEFAULT_MIN_PORT = 2300;
     static final int DEFAULT_MAX_PORT = 2400;
     protected LLPresence presence;
@@ -88,12 +93,20 @@ public abstract class LLService {
 
     // chat listeners gets notified when new chats are created
     private Set<LLChatListener> chatListeners = new CopyOnWriteArraySet<LLChatListener>();
+    
+    // Set of Packet collector wrappers
+    private Set<CollectorWrapper> collectorWrappers =
+        new CopyOnWriteArraySet<CollectorWrapper>();
 
     // Set of associated connections.
     private Set<XMPPLLConnection> associatedConnections =
         new HashSet<XMPPLLConnection>();
 
     private ServerSocket socket;
+
+    static {
+        SmackConfiguration.getVersion();
+    }
 
     /**
      * Spam stdout with some debug information.
@@ -155,10 +168,44 @@ public abstract class LLService {
                         connection.addPacketListener(wrapper.getPacketListener(),
                                 wrapper.getPacketFilter());
                     }
+
+                    // add packet collectors
+                    for (CollectorWrapper cw : collectorWrappers) {
+                        cw.createPacketCollector(connection);
+                    }
                 }
             }
         });
 
+        notifyServiceListeners(this);
+    }
+
+    /**
+     * Add a LLServiceListener. The LLServiceListener is notified when a new
+     * Link-local service is created.
+     *
+     * @param listener the LLServiceListener
+     */
+    public static void addLLServiceListener(LLServiceListener listener) {
+        serviceCreatedListeners.add(listener);
+    }
+
+    /**
+     * Remove a LLServiceListener.
+     */
+    public static void removeLLServiceListener(LLServiceListener listener) {
+        serviceCreatedListeners.remove(listener);
+    }
+
+    /**
+     * Notify LLServiceListeners about a new Link-local service.
+     *
+     * @param service the new service.
+     */
+    public static void notifyServiceListeners(LLService service) {
+        for (LLServiceListener listener : serviceCreatedListeners) {
+            listener.serviceCreated(service);
+        }
     }
 
     /**
@@ -463,6 +510,12 @@ public abstract class LLService {
         return presenceDiscoverer.getPresence(serviceName);
     }
 
+    public CollectorWrapper createPacketCollector(PacketFilter filter) {
+        CollectorWrapper wrapper = new CollectorWrapper(filter);
+        collectorWrappers.add(wrapper);
+        return wrapper;
+    }
+
     /**
      * Return a collection of all active connections. This may be used if the
      * user wants to change a property on all connections, such as add a service
@@ -584,19 +637,43 @@ public abstract class LLService {
      * @param packet the packet to be sent.
      * @throws XMPPException if the packet cannot be sent.
      */
-    void sendPacket(Packet packet) throws XMPPException {
+    public void sendPacket(Packet packet) throws XMPPException {
         getConnection(packet.getTo()).sendPacket(packet);
     }
 
     /**
-     * Send an IQ set or get and get the respons.
+     * Send an IQ set or get and wait for the response. This function works
+     * different from a normal one-connection IQ request where a packet
+     * collector is created and added to the connection. This function
+     * takes care of (at least) two cases when this doesn't work:
+     * <ul>
+     *  <li>Consider client A requests something from B. This is done by
+     *      A connecting to B (no existing connection is available), then
+     *      sending an IQ request to B using the new connection and starts
+     *      waiting for a reply. However the connection between them may be
+     *      terminated due to inactivity, and for B to reply, it have to 
+     *      establish a new connection. This function takes care of this
+     *      by listening for the packets on all new connections.</li>
+     *  <li>Consider client A and client B concurrently establishes
+     *      connections between them. This will result in two parallell
+     *      connections between the two entities and the two clients may
+     *      choose whatever connection to use when communicating. This
+     *      function takes care of the possibility that if A requests
+     *      something from B using connection #1 and B replies using
+     *      connection #2, the packet will still be collected.</li>
+     * </ul>
      */
     public IQ getIQResponse(IQ request) throws XMPPException {
         XMPPLLConnection connection = getConnection(request.getTo());
 
         // Create a packet collector to listen for a response.
-        PacketCollector collector = connection.createPacketCollector(
-                new PacketIDFilter(request.getPacketID()));
+        // Filter: req.id == rpl.id ^ (rp.iqtype in (result, error))
+        CollectorWrapper collector = createPacketCollector(
+                new AndFilter(
+                    new PacketIDFilter(request.getPacketID()),
+                    new OrFilter(
+                        new IQTypeFilter(IQ.Type.RESULT),
+                        new IQTypeFilter(IQ.Type.ERROR))));
 
         connection.sendPacket(request);
 
@@ -756,6 +833,99 @@ public abstract class LLService {
 
         public PacketFilter getPacketFilter() {
             return packetFilter;
+        }
+    }
+
+    /**
+     * Packet Collector Wrapper which is used for collecting packages
+     * from multiple connections as well as newly established connections (works
+     * together with LLService constructor.
+     */
+    public class CollectorWrapper {
+        // Existing collectors.
+        private Set<PacketCollector> collectors =
+            new CopyOnWriteArraySet<PacketCollector>();
+
+        // Packet filter for all the collectors.
+        private PacketFilter packetFilter;
+
+        // A common object used for shared locking between
+        // the collectors.
+        private Object lock = new Object();
+
+        private CollectorWrapper(PacketFilter packetFilter) {
+            this.packetFilter = packetFilter;
+
+            // Apply to all active connections
+            for (XMPPLLConnection connection : getConnections()) {
+                createPacketCollector(connection);
+            }
+        }
+
+        /**
+         * Create a new per-connection packet collector.
+         *
+         * @param connection the connection the collector should be added to.
+         */
+        private void createPacketCollector(XMPPLLConnection connection) {
+            synchronized (connection) {
+                PacketCollector collector =
+                    connection.createPacketCollector(packetFilter);
+                collector.setLock(lock);
+                collectors.add(collector);
+            }
+        }
+
+        /**
+         * Returns the next available packet. The method call will block (not return)
+         * until a packet is available or the <tt>timeout</tt> has elapased. If the
+         * timeout elapses without a result, <tt>null</tt> will be returned.
+         *
+         * @param timeout the amount of time to wait for the next packet
+         *                (in milleseconds).
+         * @return the next available packet.
+         */
+        public synchronized Packet nextResult(long timeout) {
+            Packet packet;
+            long waitTime = timeout;
+            long start = System.currentTimeMillis();
+
+            try {
+                while (true) {
+                    for (PacketCollector c : collectors) {
+                        if (c.isCanceled())
+                            collectors.remove(c);
+                        else {
+                            packet = c.pollResult();
+                            if (packet != null)
+                                return packet;
+                        }
+                    }
+
+                    if (waitTime <= 0) {
+                        break;
+                    }
+
+                    // wait
+                    synchronized (lock) {
+                        lock.wait(waitTime);
+                    }
+                    long now = System.currentTimeMillis();
+                    waitTime -= (now - start);
+                }
+            }
+            catch (InterruptedException ie) {
+                // ignore
+            }
+
+            return null;
+        }
+
+        public void cancel() {
+            for (PacketCollector c : collectors) {
+                c.cancel();
+            }
+            collectorWrappers.remove(this);
         }
     }
 }

@@ -4,6 +4,8 @@ import org.jivesoftware.smack.util.Tuple;
 
 import java.util.List;
 import java.util.LinkedList;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Class for describing a Link-local presence information according to XEP-0174.
@@ -32,6 +34,10 @@ public class LLPresence {
     private String hash, ver, node;
     // XEP-0174 specifies that if status is not specified it is equal to "avail".
     private Mode status = Mode.avail;
+
+    // The unknown
+    private Map<String,String> rest =
+        new ConcurrentHashMap<String,String>();
 
     public static enum Mode {
         avail, away, dnd
@@ -86,6 +92,11 @@ public class LLPresence {
             }
             else if (t.a.equals("msg"))
                 setMsg(t.b);
+            else {
+                // Unknown key
+                if (!rest.containsKey(t.a))
+                    rest.put(t.a, t.b);
+            }
         }
     }
 
@@ -103,6 +114,11 @@ public class LLPresence {
         list.add(new Tuple<String,String>("node", node));
         list.add(new Tuple<String,String>("ver", ver));
         list.add(new Tuple<String,String>("port.p2ppj", new Integer(port).toString()));
+
+        for (Map.Entry<String,String> e : rest.entrySet()) {
+            list.add(new Tuple<String,String>(e.getKey(), e.getValue()));
+        }
+
         return list;
     }
 
@@ -213,6 +229,14 @@ public class LLPresence {
 
     public int getPort() {
         return port;
+    }
+
+    public String getValue(String key) {
+        return rest.get(key);
+    }
+
+    public void putValue(String key, String value) {
+        rest.put(key, value);
     }
 
     public boolean equals(Object o) {

@@ -6,6 +6,9 @@ import org.jivesoftware.smack.XMPPLLConnection;
 import org.jivesoftware.smack.LLService;
 import org.jivesoftware.smack.LLPresence;
 import org.jivesoftware.smack.LLPresenceListener;
+import org.jivesoftware.smack.LLServiceListener;
+import org.jivesoftware.smack.LLServiceStateListener;
+import org.jivesoftware.smack.packet.Message;
 import org.jivesoftware.smackx.packet.DiscoverInfo;
 import org.jivesoftware.smackx.packet.DiscoverItems;
 import org.jivesoftware.smackx.packet.DataForm;
@@ -27,6 +30,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author Jonas Ådahl
  */
 public class LLServiceDiscoveryManager {
+    private static Map<LLService,LLServiceDiscoveryManager> serviceManagers =
+        new ConcurrentHashMap<LLService,LLServiceDiscoveryManager>();
+
     private Map<String, NodeInformationProvider> nodeInformationProviders =
             new ConcurrentHashMap<String,NodeInformationProvider>();
     private final List<String> features =
@@ -40,9 +46,38 @@ public class LLServiceDiscoveryManager {
         XMPPLLConnection.addLLConnectionListener(new ConnectionServiceMaintainer());
     }*/
 
-    public LLServiceDiscoveryManager(LLService service) {
-        this.service = service;
+    static {
+        LLService.addLLServiceListener(new LLServiceListener() {
+            public void serviceCreated(LLService service) {
+                addLLServiceDiscoveryManager(
+                    new LLServiceDiscoveryManager(service));
+            }
+        });
+    }
 
+    private LLServiceDiscoveryManager(LLService llservice) {
+        this.service = llservice;
+
+        // Add LLService state listener
+        service.addServiceStateListener(new LLServiceStateListener() {
+            private void removeEntry() {
+                removeLLServiceDiscoveryManager(service);
+            }
+
+            public void serviceClosed() {
+                removeEntry();
+            }
+
+            public void serviceClosedOnError(Exception e) {
+                removeEntry();
+            }
+
+            public void unknownOriginMessage(Message e) {
+                // ignore
+            }
+        });
+
+        // Entity Capabilities
         capsManager = new EntityCapsManager();
         capsManager.addCapsVerListener(new CapsPresenceRenewer());
         capsManager.calculateEntityCapsVersion(
@@ -68,8 +103,30 @@ public class LLServiceDiscoveryManager {
             }
         });
 
-
         service.addLLServiceConnectionListener(new ConnectionServiceMaintainer());
+    }
+
+    /**
+     * Add LLServiceDiscoveryManager to the map of existing ones.
+     */
+    private static void addLLServiceDiscoveryManager(LLServiceDiscoveryManager manager) {
+        serviceManagers.put(manager.service, manager);
+    }
+
+    /**
+     * Remove LLServiceDiscoveryManager from the map of existing ones.
+     */
+    private static void removeLLServiceDiscoveryManager(LLService service) {
+        serviceManagers.remove(service);
+    }
+
+    /**
+     * Get the LLServiceDiscoveryManager instance for a specific Link-local service.
+     *
+     * @param service 
+     */
+    public static LLServiceDiscoveryManager getInstanceFor(LLService service) {
+        return serviceManagers.get(service);
     }
 
     /**

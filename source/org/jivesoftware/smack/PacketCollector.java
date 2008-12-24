@@ -51,6 +51,7 @@ public class PacketCollector {
     private LinkedList<Packet> resultQueue;
     private AbstractPacketReader packetReader;
     private boolean cancelled = false;
+    private Object lock = new Object();
 
     /**
      * Creates a new packet collector. If the packet filter is <tt>null</tt>, then
@@ -66,6 +67,19 @@ public class PacketCollector {
     }
 
     /**
+     * Set the lock used for notifying about new packages.
+     *
+     * @param lock the new lock object.
+     */
+    public synchronized void setLock(Object lock) {
+        Object oldLock = this.lock;
+        this.lock = lock;
+        synchronized (oldLock) {
+            oldLock.notifyAll();
+        }
+    }
+
+    /**
      * Explicitly cancels the packet collector so that no more results are
      * queued up. Once a packet collector has been cancelled, it cannot be
      * re-enabled. Instead, a new packet collector must be created.
@@ -76,6 +90,15 @@ public class PacketCollector {
             cancelled = true;
             packetReader.cancelPacketCollector(this);
         }
+    }
+
+    /**
+     * Returns true if the packet collector is canceled.
+     *
+     * @return true if canceled, false if still active.
+     */
+    public boolean isCanceled() {
+        return cancelled;
     }
 
     /**
@@ -115,7 +138,9 @@ public class PacketCollector {
         // Wait indefinitely until there is a result to return.
         while (resultQueue.isEmpty()) {
             try {
-                wait();
+                synchronized (lock) {
+                    lock.wait();
+                }
             }
             catch (InterruptedException ie) {
                 // Ignore.
@@ -144,7 +169,9 @@ public class PacketCollector {
                     if (waitTime <= 0) {
                         break;
                     }
-                    wait(waitTime);
+                    synchronized (lock) {
+                        lock.wait(waitTime);
+                    }
                     long now = System.currentTimeMillis();
                     waitTime -= (now - start);
                     start = now;
@@ -186,7 +213,9 @@ public class PacketCollector {
             // Add the new packet.
             resultQueue.addFirst(packet);
             // Notify waiting threads a result is available.
-            notifyAll();
+            synchronized (lock) {
+                lock.notifyAll();
+            }
         }
     }
 }

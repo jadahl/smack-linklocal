@@ -6,6 +6,7 @@
     <startupClasses>
         <className>org.jivesoftware.smack.XMPPConnection</className>        
         <className>org.jivesoftware.smackx.EntityCapsManager</className>
+        <className>org.jivesoftware.smackx.LLServiceDiscoveryManager</className>
         <className>org.jivesoftware.smackx.ServiceDiscoveryManager</className>
         <className>org.jivesoftware.smack.PrivacyListManager</className>        
         <className>org.jivesoftware.smackx.XHTMLManager</className>
