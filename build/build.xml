@@ -107,9 +107,6 @@
                 <fileset dir="${merge.lib.dir}">
                     <include name="*.jar"/>
                 </fileset>
-                <fileset dir="${basedir}/build">
-                    <include name="jmdns.jar"/>
-                </fileset>
             </classpath>
         </javac>		
 		<mkdir dir="${compile.dir}/jingle/extension" />
@@ -200,6 +197,7 @@
             includes="org/jivesoftware/smack/**/*.class, **/smack-config.xml"
          >
              <zipfileset src="${merge.lib.dir}/xpp.jar"/>
+             <zipfileset src="${merge.lib.dir}/jmdns.jar"/>
         </jar>
         <copy todir="${compile.dir}/META-INF" file="${basedir}/build/resources/META-INF/smack.providers" />
         <jar destfile="${jar.dest.dir}/smackx.jar"
