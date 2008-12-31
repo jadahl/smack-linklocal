@@ -74,6 +74,8 @@ public class PacketCollector {
     public synchronized void setLock(Object lock) {
         Object oldLock = this.lock;
         this.lock = lock;
+
+        // release the threads waiting for a notify on the old lock
         synchronized (oldLock) {
             oldLock.notifyAll();
         }
@@ -134,7 +136,7 @@ public class PacketCollector {
      *
      * @return the next available packet.
      */
-    public synchronized Packet nextResult() {
+    public Packet nextResult() {
         // Wait indefinitely until there is a result to return.
         while (resultQueue.isEmpty()) {
             try {
@@ -157,7 +159,7 @@ public class PacketCollector {
      * @param timeout the amount of time to wait for the next packet (in milleseconds).
      * @return the next available packet.
      */
-    public synchronized Packet nextResult(long timeout) {
+    public Packet nextResult(long timeout) {
         // Wait up to the specified amount of time for a result.
         if (resultQueue.isEmpty()) {
             long waitTime = timeout;
