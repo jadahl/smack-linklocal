@@ -684,7 +684,7 @@ public abstract class LLService {
         // Stop queuing results
         collector.cancel();
         if (result == null) {
-            throw new XMPPException("No response from the remove host.");
+            throw new XMPPException("No response from the remote host.");
         }
 
         return result;
