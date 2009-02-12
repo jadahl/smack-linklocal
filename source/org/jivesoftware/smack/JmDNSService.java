@@ -8,6 +8,7 @@ import javax.jmdns.ServiceInfo;
 //import javax.jmdns.impl.DNSRecord;
 //import javax.jmdns.impl.DNSListener;
 
+import java.net.InetAddress;
 import java.io.IOException;
 import java.util.Hashtable;
 
@@ -32,8 +33,18 @@ public class JmDNSService extends LLService {
      * @param presence the mDNS presence information that should be used.
      */
     public static LLService create(LLPresence presence) throws XMPPException {
+        return create(presence, null);
+    }
+
+    /**
+     * Instantiate a new JmDNSService and start to listen for connections.
+     *
+     * @param presence the mDNS presence information that should be used.
+     * @param addr the INET Address to use.
+     */
+    public static LLService create(LLPresence presence, InetAddress addr) throws XMPPException {
         // Start the JmDNS daemon.
-        initJmDNS();
+        initJmDNS(addr);
 
         // Start the presence discoverer
         JmDNSPresenceDiscoverer presenceDiscoverer = new JmDNSPresenceDiscoverer();
@@ -56,10 +67,15 @@ public class JmDNSService extends LLService {
     /**
      * Start the JmDNS daemon.
      */
-    private static void initJmDNS() throws XMPPException {
+    private static void initJmDNS(InetAddress addr) throws XMPPException {
         try {
             if (jmdns == null) {
-                jmdns = JmDNS.create();
+                if (addr == null) {
+                    jmdns = JmDNS.create();
+                }
+                else {
+                    jmdns = JmDNS.create(addr);
+                }
             }
         }
         catch (IOException ioe) {
