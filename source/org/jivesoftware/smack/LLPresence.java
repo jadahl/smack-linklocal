@@ -135,6 +135,10 @@ public class LLPresence {
         setJID(p.getJID());
     }
 
+    public void setServiceName(String serviceName) {
+        this.serviceName = serviceName;
+    }
+
     public void setFirstName(String name) {
         firstName = name;
     }

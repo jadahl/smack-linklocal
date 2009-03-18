@@ -4,10 +4,13 @@ import org.jivesoftware.smack.util.Tuple;
 
 import javax.jmdns.JmDNS;
 import javax.jmdns.ServiceInfo;
-//import javax.jmdns.impl.JmDNSImpl;
+import javax.jmdns.impl.JmDNSImpl;
+import javax.jmdns.impl.DNSCache;
+import javax.jmdns.impl.DNSEntry;
 //import javax.jmdns.impl.DNSRecord;
 //import javax.jmdns.impl.DNSListener;
 
+import java.util.LinkedList;
 import java.net.InetAddress;
 import java.io.IOException;
 import java.util.Hashtable;
@@ -51,9 +54,6 @@ public class JmDNSService extends LLService {
 
         // Start the presence service
         JmDNSService service = new JmDNSService(presence, presenceDiscoverer);
-
-        // Initiate the mDNS XMPP Service 
-        //service.init();
 
         return service;
     }
@@ -108,7 +108,31 @@ public class JmDNSService extends LLService {
         serviceInfo = ServiceInfo.create(SERVICE_TYPE,
                 presence.getServiceName(), presence.getPort(), 0, 0, ht);
         try {
+            String originalName = serviceInfo.getQualifiedName();
             jmdns.registerService(serviceInfo);
+            presence.setServiceName(serviceInfo.getName());
+
+            if (!originalName.equals(serviceInfo.getQualifiedName())) {
+                // Update presence service name
+                // Name collision occured, lets remove confusing elements
+                // from cache in case something goes wrong
+                JmDNSImpl jmdnsimpl = (JmDNSImpl) jmdns;
+                DNSCache.CacheNode n = jmdnsimpl.getCache().find(originalName);
+
+                LinkedList<DNSEntry> toRemove = new LinkedList<DNSEntry>();
+                while (n != null) {
+                    DNSEntry e = n.getValue();
+                    if (e != null)
+                        toRemove.add(e);
+
+                    n = n.next();
+                }
+
+                // Remove the DNSEntry's one by one
+                for (DNSEntry e : toRemove) {
+                    jmdnsimpl.getCache().remove(e);
+                }
+            }
         }
         catch (IOException ioe) {
             throw new XMPPException(ioe);

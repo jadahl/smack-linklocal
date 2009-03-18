@@ -21,10 +21,11 @@ class JmDNSPresenceDiscoverer extends LLPresenceDiscoverer {
     protected static final int SERVICE_REQUEST_TIMEOUT = 10000; 
     protected static JmDNS jmdns;
 
-    public JmDNSPresenceDiscoverer() throws XMPPException {
+    JmDNSPresenceDiscoverer() throws XMPPException {
         jmdns = JmDNSService.jmdns;
         if (jmdns == null)
             throw new XMPPException("Failed to fully initiate mDNS daemon.");
+
         jmdns.addServiceListener(JmDNSService.SERVICE_TYPE, new PresenceServiceListener());
     }
 

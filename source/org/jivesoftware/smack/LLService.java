@@ -61,8 +61,6 @@ public abstract class LLService {
     static final int DEFAULT_MIN_PORT = 2300;
     static final int DEFAULT_MAX_PORT = 2400;
     protected LLPresence presence;
-    private String serviceName;
-    private String host;
     private boolean done = false;
     private Thread listenerThread;
 
@@ -130,8 +128,6 @@ public abstract class LLService {
     protected LLService(LLPresence presence, LLPresenceDiscoverer discoverer) {
         this.presence = presence;
         presenceDiscoverer = discoverer;
-        serviceName = presence.getServiceName();
-        host = presence.getHost();
         service = this;
 
         XMPPLLConnection.addLLConnectionListener(new LLConnectionListener() {

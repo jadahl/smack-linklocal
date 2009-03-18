@@ -17,9 +17,19 @@ public class TestMDNS {
     LLService service;
     public static void main(String[] argv) {
         Handler ch = new ConsoleHandler();
+        ch.setLevel(Level.FINEST);
         //System.out.println(ConsoleHandler.class.getName());
+        //Logger.global.addHandler(ch);
         Logger.getLogger("").addHandler(ch);
+        //Logger.getLogger("").setLevel(Level.FINEST);
+        //Logger.global.setLevel(Level.FINEST);
+        //Logger.getLogger("javax.jmdns.impl.JmDNSImpl").addHandler(ch);
         //Logger.getLogger("javax.jmdns.impl.SocketListener").setLevel(Level.FINEST);
+        //
+        //
+        //
+        Logger.getLogger("javax.jmdns").log(Level.FINE, "Fine?");
+        Logger.getLogger("javax.jmdns").log(Level.WARNING, "Warning?");
         TestMDNS test = new TestMDNS();
         test.run();
     }
