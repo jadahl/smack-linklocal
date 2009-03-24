@@ -9,6 +9,14 @@ import org.jivesoftware.smack.packet.Message;
 public interface LLServiceStateListener {
 
     /**
+     * Notification that the service name was changed.
+     *
+     * @param newName the new service name
+     * @param oldName the previous service name
+     */
+    public void serviceNameChanged(String newName, String oldName);
+
+    /**
      * Notification that the connection was closed normally.
      */
     public void serviceClosed();

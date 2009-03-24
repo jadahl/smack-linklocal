@@ -1,14 +1,29 @@
+/*
+ * Copyright 2009 Jonas Ådahl.
+ *
+ * All rights reserved. Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.jivesoftware.smack;
 
 import org.jivesoftware.smack.util.Tuple;
 
 import javax.jmdns.JmDNS;
 import javax.jmdns.ServiceInfo;
+import javax.jmdns.ServiceNameListener;
 import javax.jmdns.impl.JmDNSImpl;
 import javax.jmdns.impl.DNSCache;
 import javax.jmdns.impl.DNSEntry;
-//import javax.jmdns.impl.DNSRecord;
-//import javax.jmdns.impl.DNSListener;
 
 import java.util.LinkedList;
 import java.net.InetAddress;
@@ -20,7 +35,7 @@ import java.util.Hashtable;
  *
  * @author Jonas Ådahl
  */
-public class JmDNSService extends LLService {
+public class JmDNSService extends LLService implements ServiceNameListener {
     static JmDNS jmdns = null;
     static JmDNSPresenceDiscoverer presenceDiscoverer = null;
     private ServiceInfo serviceInfo;
@@ -107,6 +122,8 @@ public class JmDNSService extends LLService {
         }
         serviceInfo = ServiceInfo.create(SERVICE_TYPE,
                 presence.getServiceName(), presence.getPort(), 0, 0, ht);
+        serviceInfo.addServiceNameListener(this);
+
         try {
             String originalName = serviceInfo.getQualifiedName();
             jmdns.registerService(serviceInfo);
@@ -149,6 +166,10 @@ public class JmDNSService extends LLService {
         catch (IOException ioe) {
             throw new XMPPException("Exception occured when reannouncing mDNS presence.", ioe);
         }
+    }
+
+    public void serviceNameChanged(String newName, String oldName) {
+        super.serviceNameChanged(newName, oldName);
     }
 
     /**
