@@ -370,6 +370,15 @@ public abstract class LLService {
     }
 
     protected void serviceNameChanged(String newName, String oldName) {
+        // update our own presence with the new name, for future connections
+        presence.setServiceName(newName);
+
+        // FIXME / TODO
+        //
+        //  [X] Notify listeners
+        //  [ ] Clean up chat sessions
+        //  [ ] Clean up connections
+
         for (LLServiceStateListener listener : stateListeners) {
             listener.serviceNameChanged(newName, oldName);
         }
@@ -402,7 +411,11 @@ public abstract class LLService {
     }
 
     /**
-     * XXX document.
+     * Add the given connection to the list of associated connections.
+     * An associated connection means it's a Link-Local connection managed
+     * by this service.
+     *
+     * @param connection the connection to be associated
      */
     private void addAssociatedConnection(XMPPLLConnection connection) {
         synchronized (associatedConnections) {
@@ -411,7 +424,9 @@ public abstract class LLService {
     }
 
     /**
-     * XXX document.
+     * Remove the given connection from the list of associated connections.
+     *
+     * @param connection the connection to be removed.
      */
     private void removeAssociatedConnection(XMPPLLConnection connection) {
         synchronized (associatedConnections) {
@@ -419,6 +434,14 @@ public abstract class LLService {
         }
     }
 
+    /**
+     * Return true if the given connection is associated / managed by this
+     * service.
+     *
+     * @param connection the connection to be checked
+     * @return true if the connection is associated with this service or false
+     * if it is not associated with this service.
+     */
     private boolean isAssociatedConnection(XMPPLLConnection connection) {
         synchronized (associatedConnections) {
             return associatedConnections.contains(connection);

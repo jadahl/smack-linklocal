@@ -169,7 +169,12 @@ public class JmDNSService extends LLService implements ServiceNameListener {
     }
 
     public void serviceNameChanged(String newName, String oldName) {
-        super.serviceNameChanged(newName, oldName);
+        try {
+            super.serviceNameChanged(newName, oldName);
+        }
+        catch (Throwable t) {
+            // ignore
+        }
     }
 
     /**
@@ -178,5 +183,12 @@ public class JmDNSService extends LLService implements ServiceNameListener {
     public void makeUnavailable() {
         jmdns.unregisterService(serviceInfo);
         serviceInfo = null;
+    }
+
+
+    @Override
+    public void spam() {
+        super.spam();
+        System.out.println("Service name: " + serviceInfo.getName());
     }
 }

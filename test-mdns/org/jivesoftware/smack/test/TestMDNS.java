@@ -53,6 +53,25 @@ public class TestMDNS {
             System.out.println("Initiating Link-local service...");
             // Create a XMPP Link-local service.
             service = JmDNSService.create(presence);
+            service.addServiceStateListener(new LLServiceStateListener() {
+                public void serviceNameChanged(String newName, String oldName) {
+                    System.out.println("Service named changed from " + oldName + " to " + newName + ".");
+                }
+
+                public void serviceClosed() {
+                    System.out.println("Service closed");
+                }
+
+                public void serviceClosedOnError(Exception e) {
+                    System.out.println("Service closed due to an exception");
+                    e.printStackTrace();
+                }
+
+                public void unknownOriginMessage(Message m) {
+                    System.out.println("This message has unknown origin:");
+                    System.out.println(m.toXML());
+                }
+            });
 
             // Adding presence listener.
             service.addPresenceListener(new MDNSListener());

@@ -75,6 +75,10 @@ public class LLServiceDiscoveryManager {
             public void unknownOriginMessage(Message e) {
                 // ignore
             }
+
+            public void serviceNameChanged(String n, String o) {
+                // ignore
+            }
         });
 
         // Entity Capabilities
