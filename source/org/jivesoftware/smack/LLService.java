@@ -135,7 +135,7 @@ public abstract class LLService {
 
         System.out.println("Known presences:");
         for (LLPresence presence : presenceDiscoverer.getPresences()) {
-            System.out.println(" * " + presence.getServiceName() + "(" + presence.getStatus() + ")");
+            System.out.println(" * " + presence.getServiceName() + "(" + presence.getStatus() + ", " + presence.getHost() + ":" + presence.getPort() + ")");
         }
         Thread.currentThread().getThreadGroup().list();
     }
