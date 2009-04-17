@@ -25,7 +25,7 @@ import org.jivesoftware.smack.provider.PacketExtensionProvider;
 import org.jivesoftware.smack.provider.ProviderManager;
 import org.xmlpull.v1.XmlPullParser;
 
-import java.beans.PropertyDescriptor;
+//import java.beans.PropertyDescriptor;
 import java.io.ByteArrayInputStream;
 import java.io.ObjectInputStream;
 import java.util.ArrayList;
@@ -423,9 +423,16 @@ public class PacketParserUtils {
     	return null;
     }
 
+    
     public static Object parseWithIntrospection(String elementName,
             Class objectClass, XmlPullParser parser) throws Exception
     {
+        return null;
+        /**
+         * XXX This uses java.beans.* which is not supported on the
+         * android platform.
+         */
+        /*
         boolean done = false;
         Object object = objectClass.newInstance();
         while (!done) {
@@ -449,7 +456,9 @@ public class PacketParserUtils {
             }
         }
         return object;
+        */
     }
+    
 
     /**
      * Decodes a String into an object of the specified type. If the object
@@ -484,4 +493,5 @@ public class PacketParserUtils {
         }
         return null;
     }
+    
 }
