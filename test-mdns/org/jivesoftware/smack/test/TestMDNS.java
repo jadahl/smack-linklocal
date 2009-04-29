@@ -191,6 +191,10 @@ public class TestMDNS {
             System.out.println("Discovered new chat being created.");
             chat.addMessageListener(new MyMessageListener(chat));
         }
+
+        public void chatInvalidated(LLChat chat) {
+            System.out.println("Chat invalidated: " + chat.getServiceName());
+        }
     }
 
     private class MyMessageListener implements LLMessageListener {

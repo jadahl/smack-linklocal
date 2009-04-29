@@ -11,4 +11,10 @@ public interface LLChatListener {
      * @param chat the newly created chat.
      */
     public void newChat(LLChat chat);
+
+    /**
+     * Called when a chat session is invalidated (due to service
+     * name changes.
+     */
+    public void chatInvalidated(LLChat chat);
 }

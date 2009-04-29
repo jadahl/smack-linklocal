@@ -376,8 +376,19 @@ public abstract class LLService {
         // FIXME / TODO
         //
         //  [X] Notify listeners
-        //  [ ] Clean up chat sessions
+        //  [X] Clean up chat sessions
         //  [ ] Clean up connections
+
+
+        // Cleanup chats (remove tho two affected chats)
+        LLChat c1 = removeLLChat(newName);
+        LLChat c2 = removeLLChat(oldName);
+        for (LLChatListener listener : chatListeners) {
+            if (c1 != null)
+                listener.chatInvalidated(c1);
+            if (c2 != null)
+                listener.chatInvalidated(c1);
+        }
 
         for (LLServiceStateListener listener : stateListeners) {
             listener.serviceNameChanged(newName, oldName);
@@ -600,6 +611,10 @@ public abstract class LLService {
 
     void removeOutgoingConnection(XMPPLLConnection connection) {
         outgoing.remove(connection.getServiceName());
+    }
+
+    LLChat removeLLChat(String serviceName) {
+        return chats.remove(serviceName);
     }
 
     void newLLChat(LLChat chat) {
