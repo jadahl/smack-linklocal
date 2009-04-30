@@ -162,101 +162,114 @@ public class ProviderManager {
                 while (providerEnum.hasMoreElements()) {
                     URL url = (URL) providerEnum.nextElement();
                     InputStream providerStream = null;
-                    try {
-                        providerStream = url.openStream();
-                        XmlPullParser parser = new MXParser();
-                        parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
-                        parser.setInput(providerStream, "UTF-8");
-                        int eventType = parser.getEventType();
-                        do {
-                            if (eventType == XmlPullParser.START_TAG) {
-                                if (parser.getName().equals("iqProvider")) {
-                                    parser.next();
-                                    parser.next();
-                                    String elementName = parser.nextText();
-                                    parser.next();
-                                    parser.next();
-                                    String namespace = parser.nextText();
-                                    parser.next();
-                                    parser.next();
-                                    String className = parser.nextText();
-                                    // Only add the provider for the namespace if one isn't
-                                    // already registered.
-                                    String key = getProviderKey(elementName, namespace);
-                                    if (!iqProviders.containsKey(key)) {
-                                        // Attempt to load the provider class and then create
-                                        // a new instance if it's an IQProvider. Otherwise, if it's
-                                        // an IQ class, add the class object itself, then we'll use
-                                        // reflection later to create instances of the class.
-                                        try {
-                                            // Add the provider to the map.
-                                            Class provider = Class.forName(className);
-                                            if (IQProvider.class.isAssignableFrom(provider)) {
-                                                iqProviders.put(key, provider.newInstance());
-                                            }
-                                            else if (IQ.class.isAssignableFrom(provider)) {
-                                                iqProviders.put(key, provider);
-                                            }
-                                        }
-                                        catch (ClassNotFoundException cnfe) {
-                                            cnfe.printStackTrace();
-                                        }
-                                    }
-                                }
-                                else if (parser.getName().equals("extensionProvider")) {
-                                    parser.next();
-                                    parser.next();
-                                    String elementName = parser.nextText();
-                                    parser.next();
-                                    parser.next();
-                                    String namespace = parser.nextText();
-                                    parser.next();
-                                    parser.next();
-                                    String className = parser.nextText();
-                                    // Only add the provider for the namespace if one isn't
-                                    // already registered.
-                                    String key = getProviderKey(elementName, namespace);
-                                    if (!extensionProviders.containsKey(key)) {
-                                        // Attempt to load the provider class and then create
-                                        // a new instance if it's a Provider. Otherwise, if it's
-                                        // a PacketExtension, add the class object itself and
-                                        // then we'll use reflection later to create instances
-                                        // of the class.
-                                        try {
-                                            // Add the provider to the map.
-                                            Class provider = Class.forName(className);
-                                            if (PacketExtensionProvider.class.isAssignableFrom(
-                                                    provider)) {
-                                                extensionProviders.put(key, provider.newInstance());
-                                            }
-                                            else if (PacketExtension.class.isAssignableFrom(
-                                                    provider)) {
-                                                extensionProviders.put(key, provider);
-                                            }
-                                        }
-                                        catch (ClassNotFoundException cnfe) {
-                                            cnfe.printStackTrace();
-                                        }
-                                    }
-                                }
-                            }
-                            eventType = parser.next();
-                        }
-                        while (eventType != XmlPullParser.END_DOCUMENT);
-                    }
-                    finally {
-                        try {
-                            providerStream.close();
-                        }
-                        catch (Exception e) {
-                            // Ignore.
-                        }
-                    }
+                    providerStream = url.openStream();
+
+                    // Parse the XML and add the providers
+                    loadFromXML(providerStream);
                 }
             }
         }
         catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    /**
+     * Parse the given input stream and load the providers specified in it
+     * and loads it into the provider manager.
+     *
+     * @param providerStream an input stream providing the xml content.
+     * @throws Exception if an error occurs.
+     */
+    public void loadFromXML(InputStream providerStream) throws Exception {
+        try {
+            XmlPullParser parser = new MXParser();
+            parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
+            parser.setInput(providerStream, "UTF-8");
+            int eventType = parser.getEventType();
+            do {
+                if (eventType == XmlPullParser.START_TAG) {
+                    if (parser.getName().equals("iqProvider")) {
+                        parser.next();
+                        parser.next();
+                        String elementName = parser.nextText();
+                        parser.next();
+                        parser.next();
+                        String namespace = parser.nextText();
+                        parser.next();
+                        parser.next();
+                        String className = parser.nextText();
+                        // Only add the provider for the namespace if one isn't
+                        // already registered.
+                        String key = getProviderKey(elementName, namespace);
+                        if (!iqProviders.containsKey(key)) {
+                            // Attempt to load the provider class and then create
+                            // a new instance if it's an IQProvider. Otherwise, if it's
+                            // an IQ class, add the class object itself, then we'll use
+                            // reflection later to create instances of the class.
+                            try {
+                                // Add the provider to the map.
+                                Class provider = Class.forName(className);
+                                if (IQProvider.class.isAssignableFrom(provider)) {
+                                    iqProviders.put(key, provider.newInstance());
+                                }
+                                else if (IQ.class.isAssignableFrom(provider)) {
+                                    iqProviders.put(key, provider);
+                                }
+                            }
+                            catch (ClassNotFoundException cnfe) {
+                                cnfe.printStackTrace();
+                            }
+                        }
+                    }
+                    else if (parser.getName().equals("extensionProvider")) {
+                        parser.next();
+                        parser.next();
+                        String elementName = parser.nextText();
+                        parser.next();
+                        parser.next();
+                        String namespace = parser.nextText();
+                        parser.next();
+                        parser.next();
+                        String className = parser.nextText();
+                        // Only add the provider for the namespace if one isn't
+                        // already registered.
+                        String key = getProviderKey(elementName, namespace);
+                        if (!extensionProviders.containsKey(key)) {
+                            // Attempt to load the provider class and then create
+                            // a new instance if it's a Provider. Otherwise, if it's
+                            // a PacketExtension, add the class object itself and
+                            // then we'll use reflection later to create instances
+                            // of the class.
+                            try {
+                                // Add the provider to the map.
+                                Class provider = Class.forName(className);
+                                if (PacketExtensionProvider.class.isAssignableFrom(
+                                            provider)) {
+                                    extensionProviders.put(key, provider.newInstance());
+                                            }
+                                else if (PacketExtension.class.isAssignableFrom(
+                                            provider)) {
+                                    extensionProviders.put(key, provider);
+                                            }
+                            }
+                            catch (ClassNotFoundException cnfe) {
+                                cnfe.printStackTrace();
+                            }
+                        }
+                    }
+                }
+                eventType = parser.next();
+            }
+            while (eventType != XmlPullParser.END_DOCUMENT);
+        }
+        finally {
+            try {
+                providerStream.close();
+            }
+            catch (Exception e) {
+                // Ignore.
+            }
         }
     }
 

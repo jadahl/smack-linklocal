@@ -166,7 +166,7 @@ public abstract class LLService {
 
                     // add message listener. filter logic:
                     // type = msg ^ (msg.type = chat v msg.type = normal v msg.type = error)
-                    connection.addPacketListener(new MessageListener(service),
+                    connection.addPacketListener(new MessageListener(),
                         new AndFilter(
                             new PacketTypeFilter(Message.class),
                             new OrFilter(
@@ -826,12 +826,6 @@ public abstract class LLService {
      * is created.
      */
     private class MessageListener implements PacketListener {
-        private LLService service;
-
-        MessageListener(LLService service) {
-            this.service = service;
-        }
-
         public void processPacket(Packet packet) {
             // handle message
             if (packet instanceof Message) {
