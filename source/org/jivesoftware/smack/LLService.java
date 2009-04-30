@@ -31,6 +31,7 @@ import org.jivesoftware.smack.filter.IQTypeFilter;
 
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
@@ -265,7 +266,11 @@ public abstract class LLService {
         listenerThread = new Thread() {
             public void run() {
                 try {
+                    // Listen for connections
                     listenForConnections();
+
+                    // If listen for connections returns with no exception,
+                    // the service has closed down
                     for (LLServiceStateListener listener : stateListeners)
                         listener.serviceClosed();
                 } catch (XMPPException e) {
@@ -336,6 +341,12 @@ public abstract class LLService {
                 connectionInitiatorThread.setDaemon(true);
                 connectionInitiatorThread.start();
             }
+            catch (SocketException se) {
+                // If we are closing down, it's probably closed socket exception.
+                if (!done) {
+                    throw new XMPPException("Link-local service unexpectedly closed down.", se);
+                }
+            }
             catch (IOException ioe) {
                 throw new XMPPException("Link-local service unexpectedly closed down.", ioe);
             }
@@ -377,6 +388,7 @@ public abstract class LLService {
         //
         //  [X] Notify listeners
         //  [X] Clean up chat sessions
+        //  [ ] Clean up entity caps
         //  [ ] Clean up connections
 
 

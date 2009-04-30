@@ -454,6 +454,28 @@ public class ServiceDiscoveryManager {
     }
 
     /**
+     * Returns the discovered information of a given XMPP entity addressed by its JID
+     * if it's known by the entity caps manager.
+     *
+     * @param entityID the address of the XMPP entity
+     * @return the disovered info or null if no such info is available from the
+     * entity caps manager.
+     * @throws XMPPException if the operation failed for some reason.
+     */
+    public DiscoverInfo discoverInfoByCaps(String entityID) throws XMPPException {
+        DiscoverInfo info = capsManager.getDiscoverInfoByUser(entityID);
+
+        if (info != null) {
+            DiscoverInfo newInfo = cloneDiscoverInfo(info);
+            newInfo.setFrom(entityID);
+            return newInfo;
+        }
+        else {
+            return null;
+        }
+    }
+
+    /**
      * Returns the discovered information of a given XMPP entity addressed by its JID.
      * 
      * @param entityID the address of the XMPP entity.
@@ -462,18 +484,18 @@ public class ServiceDiscoveryManager {
      */
     public DiscoverInfo discoverInfo(String entityID) throws XMPPException {
         // Check if the have it cached in the Entity Capabilities Manager
-        DiscoverInfo info = capsManager.getDiscoverInfoByUser(entityID);
+        DiscoverInfo info = discoverInfoByCaps(entityID);
 
-
-        // If there is no cached information retrieve new one
-        if (info == null) {
+        if (info != null) {
+            return info;
+        }
+        else {
             // If the caps node is known, use it in the request.
             String node = null;
 
             if (capsManager != null) {
                 // Get the newest node#version
                 node = capsManager.getNodeVersionByUser(entityID);
-
             }
 
             // Discover by requesting from the remote client
@@ -485,11 +507,6 @@ public class ServiceDiscoveryManager {
             }
 
             return info;
-        }
-        else {
-            DiscoverInfo newInfo = cloneDiscoverInfo(info);
-            newInfo.setFrom(entityID);
-            return newInfo;
         }
     }
 

@@ -9,6 +9,7 @@ import org.jivesoftware.smack.LLPresenceListener;
 import org.jivesoftware.smack.LLServiceListener;
 import org.jivesoftware.smack.LLServiceStateListener;
 import org.jivesoftware.smack.packet.Message;
+import org.jivesoftware.smack.packet.IQ;
 import org.jivesoftware.smackx.packet.DiscoverInfo;
 import org.jivesoftware.smackx.packet.DiscoverItems;
 import org.jivesoftware.smackx.packet.DataForm;
@@ -77,7 +78,7 @@ public class LLServiceDiscoveryManager {
             }
 
             public void serviceNameChanged(String n, String o) {
-                // ignore
+                // FIXME clean up caps manager
             }
         });
 
@@ -254,10 +255,19 @@ public class LLServiceDiscoveryManager {
 
         // If there is no cached information retrieve new one
         if (info == null) {
-            info = getInstance(serviceName).discoverInfo(serviceName);
-        }
+            // If the caps node is known, use it in the request.
+            String node = null;
 
-        return info;
+            if (capsManager != null) {
+                // Get the newest node#version
+                node = capsManager.getNodeVersionByUser(serviceName);
+            }
+
+            return discoverInfo(serviceName, node);
+        }
+        else {
+            return info;
+        }
     }
 
     /**
@@ -271,7 +281,23 @@ public class LLServiceDiscoveryManager {
      * @throws XMPPException if the operation failed for some reason.
      */
     public DiscoverInfo discoverInfo(String serviceName, String node) throws XMPPException {
-        return getInstance(serviceName).discoverInfo(serviceName, node);
+        // Discover the entity's info
+        DiscoverInfo disco = new DiscoverInfo();
+        disco.setType(IQ.Type.GET);
+        disco.setTo(serviceName);
+        disco.setNode(node);
+
+        IQ result = service.getIQResponse(disco);
+        if (result == null) {
+            throw new XMPPException("No response from the server.");
+        }
+        if (result.getType() == IQ.Type.ERROR) {
+            throw new XMPPException(result.getError());
+        }
+        if (result instanceof DiscoverInfo) {
+            return (DiscoverInfo) result;
+        }
+        throw new XMPPException("Result was not a disco info reply.");
     }
 
     /**
@@ -296,7 +322,23 @@ public class LLServiceDiscoveryManager {
      * @throws XMPPException if the operation failed for some reason.
      */
     public DiscoverItems discoverItems(String serviceName, String node) throws XMPPException {
-        return getInstance(serviceName).discoverItems(serviceName, node);
+        // Discover the entity's items
+        DiscoverItems disco = new DiscoverItems();
+        disco.setType(IQ.Type.GET);
+        disco.setTo(serviceName);
+        disco.setNode(node);
+
+        IQ result = service.getIQResponse(disco);
+        if (result == null) {
+            throw new XMPPException("No response from the server.");
+        }
+        if (result.getType() == IQ.Type.ERROR) {
+            throw new XMPPException(result.getError());
+        }
+        if (result instanceof DiscoverItems) {
+            return (DiscoverItems) result;
+        }
+        throw new XMPPException("Result was not a disco items reply.");
     }
 
     /**
