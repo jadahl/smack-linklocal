@@ -63,7 +63,7 @@ public class DiscoverInfo extends IQ {
      *
      * @return an Iterator on the discovered features of an XMPP entity
      */
-    private Iterator<Feature> getFeatures() {
+    public Iterator<Feature> getFeatures() {
         synchronized (features) {
             return Collections.unmodifiableList(features).iterator();
         }
