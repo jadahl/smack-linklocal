@@ -569,7 +569,7 @@ public abstract class LLService {
      * @param serviceName the service name which information should be returned.
      * @return the service information.
      */
-    LLPresence getPresenceByServiceName(String serviceName) {
+    public LLPresence getPresenceByServiceName(String serviceName) {
         return presenceDiscoverer.getPresence(serviceName);
     }
 

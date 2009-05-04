@@ -84,14 +84,44 @@ public class EntityCapsManager {
         caps.put(node, info);
     }
 
+    /**
+     * Add a record telling what entity caps node a user has. The entity caps
+     * node has the format node#ver.
+     *
+     * @param user the user (Full JID)
+     * @param node the entity caps node#ver
+     */
     public void addUserCapsNode(String user, String node) {
         userCaps.put(user, node);
     }
 
+    /**
+     * Remove a record telling what entity caps node a user has.
+     *
+     * @param user the user (Full JID)
+     */
+    public void removeUserCapsNode(String user) {
+        userCaps.remove(user);
+    }
+
+    /**
+     * Get the Node version (node#ver) of a user.
+     *
+     * @param user the user (Full JID)
+     * @return the node version.
+     */
     public String getNodeVersionByUser(String user) {
         return userCaps.get(user);
     }
 
+    /**
+     * Get the discover info given a user name. The discover
+     * info is returned if the user has a node#ver associated with
+     * it and the node#ver has a discover info associated with it.
+     *
+     * @param user user name (Full JID)
+     * @return the discovered info
+     */
     public DiscoverInfo getDiscoverInfoByUser(String user) {
         String capsNode = userCaps.get(user);
         if (capsNode == null)
@@ -100,14 +130,29 @@ public class EntityCapsManager {
         return getDiscoverInfoByNode(capsNode);
     }
 
+    /**
+     * Get our own caps version.
+     *
+     * @return our own caps version
+     */
     public String getCapsVersion() {
         return currentCapsVersion;
     }
 
+    /**
+     * Get our own entity node.
+     *
+     * @return our own entity node.
+     */
     public String getNode() {
         return entityNode;
     }
 
+    /**
+     * Set our own entity node.
+     *
+     * @param node the new node
+     */
     public void setNode(String node) {
         entityNode = node;
     }

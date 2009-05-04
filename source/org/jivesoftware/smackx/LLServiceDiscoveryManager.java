@@ -78,7 +78,17 @@ public class LLServiceDiscoveryManager {
             }
 
             public void serviceNameChanged(String n, String o) {
-                // FIXME clean up caps manager
+                // Remove entries
+                capsManager.removeUserCapsNode(n);
+                capsManager.removeUserCapsNode(o);
+                LLPresence np = service.getPresenceByServiceName(n);
+                LLPresence op = service.getPresenceByServiceName(o);
+
+                // Add existing values, if any
+                if (np != null && np.getNode() != null && np.getVer() != null)
+                    capsManager.addUserCapsNode(n, np.getNode() + "#" + np.getVer());
+                if (op != null && op.getNode() != null && op.getVer() != null)
+                    capsManager.addUserCapsNode(o, op.getNode() + "#" + op.getVer());
             }
         });
 
