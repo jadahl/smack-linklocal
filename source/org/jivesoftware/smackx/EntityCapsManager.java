@@ -2,7 +2,6 @@ package org.jivesoftware.smackx;
 
 import org.jivesoftware.smack.AbstractConnection;
 import org.jivesoftware.smack.PacketListener;
-import org.jivesoftware.smack.LLPresence;
 import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.packet.Presence;
 import org.jivesoftware.smack.filter.PacketFilter;
@@ -63,14 +62,6 @@ public class EntityCapsManager {
         ProviderManager.getInstance().addExtensionProvider(CapsExtension.NODE_NAME,
                 CapsExtension.XMLNS, new CapsExtensionProvider());
     }
-
-    /*EntityCapsManager(String identityType,
-            String identityName, List<String> features,
-            DataForm extendedInfo) {
-        // Calculate the first caps version
-        calculateEntityCapsVersion(identityType, identityName, features,
-                extendedInfo);
-    }*/
 
     /**
      * Add DiscoverInfo to the database.
@@ -193,7 +184,6 @@ public class EntityCapsManager {
     }
 
     private void notifyCapsVerListeners() {
-        // FIXME Add our own caps version to the caps manager.
         for (CapsVerListener listener : capsVerListeners) {
             listener.capsVerUpdated(currentCapsVersion);
         }
@@ -238,7 +228,8 @@ public class EntityCapsManager {
         return s;
     }
 
-    void calculateEntityCapsVersion(String identityType,
+    void calculateEntityCapsVersion(DiscoverInfo discoverInfo,
+            String identityType,
             String identityName, List<String> features,
             DataForm extendedInfo) {
         String s = "";
@@ -293,7 +284,18 @@ public class EntityCapsManager {
             }
         }
 
-        currentCapsVersion = capsToHash(s);
+
+        setCurrentCapsVersion(discoverInfo, capsToHash(s));
+    }
+
+    /**
+     * Set our own caps version.
+     *
+     * @param capsVersion the new caps version
+     */
+    public void setCurrentCapsVersion(DiscoverInfo discoverInfo, String capsVersion) {
+        currentCapsVersion = capsVersion;
+        addDiscoverInfoByNode(getNode() + "#" + capsVersion, discoverInfo);
         notifyCapsVerListeners();
     }
 

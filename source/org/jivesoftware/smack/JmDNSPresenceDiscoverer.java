@@ -45,16 +45,16 @@ class JmDNSPresenceDiscoverer extends LLPresenceDiscoverer {
      */
     private static List<String> TXTToList(byte[] bytes) {
         List<String> list = new LinkedList<String>();
-        try {
             int size_i = 0;
             while (size_i < bytes.length) {
                 int s = (int)(bytes[size_i]);
-                list.add(new String(bytes, ++size_i, s, "UTF-8"));
+                try {
+                    list.add(new String(bytes, ++size_i, s, "UTF-8"));
+                } catch (UnsupportedEncodingException uee) {
+                    // ignore
+                }
                 size_i += s;
             }
-        } catch (UnsupportedEncodingException uee) {
-            // XXX Without UTF-8 we are totally screwed;
-        }
         return list;
     }
 

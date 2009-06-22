@@ -255,7 +255,7 @@ public class XMPPLLConnection extends AbstractConnection // public for debugging
 
             // If debugging is enabled, we should start the thread that will listen for
             // all packets and then log them.
-            // XXX FIXME
+            // XXX FIXME debugging enabled not working
             if (false) {//configuration.isDebuggerEnabled()) {
                 packetReader.addPacketListener(debugger.getReaderListener(), null);
             }

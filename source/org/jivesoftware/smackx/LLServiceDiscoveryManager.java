@@ -95,7 +95,7 @@ public class LLServiceDiscoveryManager {
         // Entity Capabilities
         capsManager = new EntityCapsManager();
         capsManager.addCapsVerListener(new CapsPresenceRenewer());
-        capsManager.calculateEntityCapsVersion(
+        capsManager.calculateEntityCapsVersion(getOwnDiscoverInfo(),
                 ServiceDiscoveryManager.getIdentityType(),
                 ServiceDiscoveryManager.getIdentityName(),
                 features, extendedInfo);
@@ -188,6 +188,47 @@ public class LLServiceDiscoveryManager {
      */
     public static void setIdentityType(String type) {
         ServiceDiscoveryManager.setIdentityType(type);
+    }
+
+    /**
+     * Add discover info response data.
+     *
+     * @param response the discover info response packet
+     */
+    public void addDiscoverInfoTo(DiscoverInfo response) {
+        // Set this client identity
+        DiscoverInfo.Identity identity = new DiscoverInfo.Identity("client",
+                getIdentityName());
+        identity.setType(getIdentityType());
+        response.addIdentity(identity);
+        // Add the registered features to the response
+        synchronized (features) {
+            // Add Entity Capabilities (XEP-0115) feature node.
+            response.addFeature("http://jabber.org/protocol/caps");
+
+            for (Iterator<String> it = getFeatures(); it.hasNext();) {
+                response.addFeature(it.next());
+            }
+            if (extendedInfo != null) {
+                response.addExtension(extendedInfo);
+            }
+        }
+    }
+
+    /**
+     * Get a DiscoverInfo for the current entity caps node.
+     *
+     * @return a DiscoverInfo for the current entity caps node
+     */
+    public DiscoverInfo getOwnDiscoverInfo() {
+        DiscoverInfo di = new DiscoverInfo();
+        di.setType(IQ.Type.RESULT);
+        di.setNode(capsManager.getNode() + "#" + getEntityCapsVersion());
+
+        // Add discover info
+        addDiscoverInfoTo(di);
+
+        return di;
     }
 
     /**
@@ -464,7 +505,8 @@ public class LLServiceDiscoveryManager {
      * @throws XMPPException if the operation failed for some reason.
      */
     public boolean canPublishItems(String entityID) throws XMPPException {
-        return getInstance(entityID).canPublishItems(entityID);
+        DiscoverInfo info = discoverInfo(entityID);
+        return ServiceDiscoveryManager.canPublishItems(info);
     }
 
     /**
@@ -500,12 +542,22 @@ public class LLServiceDiscoveryManager {
 
     private void renewEntityCapsVersion() {
         if (capsManager != null) {
-            capsManager.calculateEntityCapsVersion(
+            capsManager.calculateEntityCapsVersion(getOwnDiscoverInfo(),
                     ServiceDiscoveryManager.getIdentityType(),
                     ServiceDiscoveryManager.getIdentityName(),
                     features, extendedInfo);
         }
     }
+
+    private String getEntityCapsVersion() {
+        if (capsManager != null) {
+            return capsManager.getCapsVersion();
+        }
+        else {
+            return null;
+        }
+    }
+
 
     /**
      * In case that a connection is unavailable we create a new connection
