@@ -1,3 +1,19 @@
+/*
+ * Copyright 2009 Jonas Ådahl.
+ *
+ * All rights reserved. Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.jivesoftware.smackx;
 
 import org.jivesoftware.smack.XMPPException;
@@ -78,14 +94,24 @@ public class LLServiceDiscoveryManager {
             }
 
             public void serviceNameChanged(String n, String o) {
-                // FIXME clean up caps manager
+                // Remove entries
+                capsManager.removeUserCapsNode(n);
+                capsManager.removeUserCapsNode(o);
+                LLPresence np = service.getPresenceByServiceName(n);
+                LLPresence op = service.getPresenceByServiceName(o);
+
+                // Add existing values, if any
+                if (np != null && np.getNode() != null && np.getVer() != null)
+                    capsManager.addUserCapsNode(n, np.getNode() + "#" + np.getVer());
+                if (op != null && op.getNode() != null && op.getVer() != null)
+                    capsManager.addUserCapsNode(o, op.getNode() + "#" + op.getVer());
             }
         });
 
         // Entity Capabilities
         capsManager = new EntityCapsManager();
         capsManager.addCapsVerListener(new CapsPresenceRenewer());
-        capsManager.calculateEntityCapsVersion(
+        capsManager.calculateEntityCapsVersion(getOwnDiscoverInfo(),
                 ServiceDiscoveryManager.getIdentityType(),
                 ServiceDiscoveryManager.getIdentityName(),
                 features, extendedInfo);
@@ -178,6 +204,47 @@ public class LLServiceDiscoveryManager {
      */
     public static void setIdentityType(String type) {
         ServiceDiscoveryManager.setIdentityType(type);
+    }
+
+    /**
+     * Add discover info response data.
+     *
+     * @param response the discover info response packet
+     */
+    public void addDiscoverInfoTo(DiscoverInfo response) {
+        // Set this client identity
+        DiscoverInfo.Identity identity = new DiscoverInfo.Identity("client",
+                getIdentityName());
+        identity.setType(getIdentityType());
+        response.addIdentity(identity);
+        // Add the registered features to the response
+        synchronized (features) {
+            // Add Entity Capabilities (XEP-0115) feature node.
+            response.addFeature("http://jabber.org/protocol/caps");
+
+            for (Iterator<String> it = getFeatures(); it.hasNext();) {
+                response.addFeature(it.next());
+            }
+            if (extendedInfo != null) {
+                response.addExtension(extendedInfo);
+            }
+        }
+    }
+
+    /**
+     * Get a DiscoverInfo for the current entity caps node.
+     *
+     * @return a DiscoverInfo for the current entity caps node
+     */
+    public DiscoverInfo getOwnDiscoverInfo() {
+        DiscoverInfo di = new DiscoverInfo();
+        di.setType(IQ.Type.RESULT);
+        di.setNode(capsManager.getNode() + "#" + getEntityCapsVersion());
+
+        // Add discover info
+        addDiscoverInfoTo(di);
+
+        return di;
     }
 
     /**
@@ -454,7 +521,8 @@ public class LLServiceDiscoveryManager {
      * @throws XMPPException if the operation failed for some reason.
      */
     public boolean canPublishItems(String entityID) throws XMPPException {
-        return getInstance(entityID).canPublishItems(entityID);
+        DiscoverInfo info = discoverInfo(entityID);
+        return ServiceDiscoveryManager.canPublishItems(info);
     }
 
     /**
@@ -490,12 +558,22 @@ public class LLServiceDiscoveryManager {
 
     private void renewEntityCapsVersion() {
         if (capsManager != null) {
-            capsManager.calculateEntityCapsVersion(
+            capsManager.calculateEntityCapsVersion(getOwnDiscoverInfo(),
                     ServiceDiscoveryManager.getIdentityType(),
                     ServiceDiscoveryManager.getIdentityName(),
                     features, extendedInfo);
         }
     }
+
+    private String getEntityCapsVersion() {
+        if (capsManager != null) {
+            return capsManager.getCapsVersion();
+        }
+        else {
+            return null;
+        }
+    }
+
 
     /**
      * In case that a connection is unavailable we create a new connection

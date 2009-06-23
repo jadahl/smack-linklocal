@@ -384,14 +384,6 @@ public abstract class LLService {
         // update our own presence with the new name, for future connections
         presence.setServiceName(newName);
 
-        // FIXME / TODO
-        //
-        //  [X] Notify listeners
-        //  [X] Clean up chat sessions
-        //  [ ] Clean up entity caps
-        //  [ ] Clean up connections
-
-
         // Cleanup chats (remove tho two affected chats)
         LLChat c1 = removeLLChat(newName);
         LLChat c2 = removeLLChat(oldName);
@@ -402,6 +394,16 @@ public abstract class LLService {
                 listener.chatInvalidated(c1);
         }
 
+        // clean up connections
+        XMPPLLConnection c;
+        c = getConnectionTo(oldName);
+        if (c != null)
+            c.disconnect();
+        c = getConnectionTo(newName);
+        if (c != null)
+            c.disconnect();
+
+        // notify listeners
         for (LLServiceStateListener listener : stateListeners) {
             listener.serviceNameChanged(newName, oldName);
         }
@@ -569,7 +571,7 @@ public abstract class LLService {
      * @param serviceName the service name which information should be returned.
      * @return the service information.
      */
-    LLPresence getPresenceByServiceName(String serviceName) {
+    public LLPresence getPresenceByServiceName(String serviceName) {
         return presenceDiscoverer.getPresence(serviceName);
     }
 

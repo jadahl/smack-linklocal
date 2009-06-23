@@ -20,8 +20,6 @@
 
 package org.jivesoftware.smackx;
 
-import org.jivesoftware.smack.XMPPLLConnection;
-//import org.jivesoftware.smack.*;
 import org.jivesoftware.smack.*;
 import org.jivesoftware.smack.filter.PacketFilter;
 import org.jivesoftware.smack.filter.PacketIDFilter;
@@ -161,6 +159,47 @@ public class ServiceDiscoveryManager {
     }
 
     /**
+     * Add discover info response data.
+     *
+     * @param response the discover info response packet
+     */
+    public void addDiscoverInfoTo(DiscoverInfo response) {
+        // Set this client identity
+        DiscoverInfo.Identity identity = new DiscoverInfo.Identity("client",
+                getIdentityName());
+        identity.setType(getIdentityType());
+        response.addIdentity(identity);
+        // Add the registered features to the response
+        synchronized (features) {
+            // Add Entity Capabilities (XEP-0115) feature node.
+            response.addFeature("http://jabber.org/protocol/caps");
+
+            for (Iterator<String> it = getFeatures(); it.hasNext();) {
+                response.addFeature(it.next());
+            }
+            if (extendedInfo != null) {
+                response.addExtension(extendedInfo);
+            }
+        }
+    }
+
+    /**
+     * Get a DiscoverInfo for the current entity caps node.
+     *
+     * @return a DiscoverInfo for the current entity caps node
+     */
+    public DiscoverInfo getOwnDiscoverInfo() {
+        DiscoverInfo di = new DiscoverInfo();
+        di.setType(IQ.Type.RESULT);
+        di.setNode(capsManager.getNode() + "#" + getEntityCapsVersion());
+
+        // Add discover info
+        addDiscoverInfoTo(di);
+
+        return di;
+    }
+
+    /**
      * Initializes the packet listeners of the connection that will answer to any
      * service discovery request. 
      */
@@ -263,23 +302,7 @@ public class ServiceDiscoveryManager {
                             (capsManager == null? true :
                              (capsManager.getNode() + "#" +
                               getEntityCapsVersion()).equals(discoverInfo.getNode()))) {
-                        // Set this client identity
-                        DiscoverInfo.Identity identity = new DiscoverInfo.Identity("client",
-                                getIdentityName());
-                        identity.setType(getIdentityType());
-                        response.addIdentity(identity);
-                        // Add the registered features to the response
-                        synchronized (features) {
-                            // Add Entity Capabilities (XEP-0115) feature node.
-                            response.addFeature("http://jabber.org/protocol/caps");
-
-                            for (Iterator<String> it = getFeatures(); it.hasNext();) {
-                                response.addFeature(it.next());
-                            }
-                            if (extendedInfo != null) {
-                                response.addExtension(extendedInfo);
-                            }
-                        }
+                        addDiscoverInfoTo(response);
                     }
                     else {
                         // Disco#info was sent to a node. Check if we have information of the
@@ -606,6 +629,19 @@ public class ServiceDiscoveryManager {
      */
     public boolean canPublishItems(String entityID) throws XMPPException {
         DiscoverInfo info = discoverInfo(entityID);
+        return canPublishItems(info);
+    }
+
+    /**
+     * Returns true if the server supports publishing of items. A client may wish to publish items
+     * to the server so that the server can provide items associated to the client. These items will
+     * be returned by the server whenever the server receives a disco request targeted to the bare
+     * address of the client (i.e. user@host.com).
+     * 
+     * @param DiscoverInfo the discover info packet to check.
+     * @return true if the server supports publishing of items.
+     */
+    public static boolean canPublishItems(DiscoverInfo info) {
         return info.containsFeature("http://jabber.org/protocol/disco#publish");
     }
 
@@ -678,7 +714,7 @@ public class ServiceDiscoveryManager {
         // version is updated
         if (connection instanceof XMPPConnection) {
             if (capsManager != null) {
-                capsManager.calculateEntityCapsVersion(
+                capsManager.calculateEntityCapsVersion(getOwnDiscoverInfo(),
                         identityType, identityName, features, extendedInfo);
                 //capsManager.notifyCapsVerListeners();
             }

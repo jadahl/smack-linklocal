@@ -1,8 +1,23 @@
+/*
+ * Copyright 2009 Jonas Ådahl.
+ *
+ * All rights reserved. Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.jivesoftware.smackx;
 
 import org.jivesoftware.smack.AbstractConnection;
 import org.jivesoftware.smack.PacketListener;
-import org.jivesoftware.smack.LLPresence;
 import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.packet.Presence;
 import org.jivesoftware.smack.filter.PacketFilter;
@@ -64,14 +79,6 @@ public class EntityCapsManager {
                 CapsExtension.XMLNS, new CapsExtensionProvider());
     }
 
-    /*EntityCapsManager(String identityType,
-            String identityName, List<String> features,
-            DataForm extendedInfo) {
-        // Calculate the first caps version
-        calculateEntityCapsVersion(identityType, identityName, features,
-                extendedInfo);
-    }*/
-
     /**
      * Add DiscoverInfo to the database.
      *
@@ -84,14 +91,44 @@ public class EntityCapsManager {
         caps.put(node, info);
     }
 
+    /**
+     * Add a record telling what entity caps node a user has. The entity caps
+     * node has the format node#ver.
+     *
+     * @param user the user (Full JID)
+     * @param node the entity caps node#ver
+     */
     public void addUserCapsNode(String user, String node) {
         userCaps.put(user, node);
     }
 
+    /**
+     * Remove a record telling what entity caps node a user has.
+     *
+     * @param user the user (Full JID)
+     */
+    public void removeUserCapsNode(String user) {
+        userCaps.remove(user);
+    }
+
+    /**
+     * Get the Node version (node#ver) of a user.
+     *
+     * @param user the user (Full JID)
+     * @return the node version.
+     */
     public String getNodeVersionByUser(String user) {
         return userCaps.get(user);
     }
 
+    /**
+     * Get the discover info given a user name. The discover
+     * info is returned if the user has a node#ver associated with
+     * it and the node#ver has a discover info associated with it.
+     *
+     * @param user user name (Full JID)
+     * @return the discovered info
+     */
     public DiscoverInfo getDiscoverInfoByUser(String user) {
         String capsNode = userCaps.get(user);
         if (capsNode == null)
@@ -100,14 +137,29 @@ public class EntityCapsManager {
         return getDiscoverInfoByNode(capsNode);
     }
 
+    /**
+     * Get our own caps version.
+     *
+     * @return our own caps version
+     */
     public String getCapsVersion() {
         return currentCapsVersion;
     }
 
+    /**
+     * Get our own entity node.
+     *
+     * @return our own entity node.
+     */
     public String getNode() {
         return entityNode;
     }
 
+    /**
+     * Set our own entity node.
+     *
+     * @param node the new node
+     */
     public void setNode(String node) {
         entityNode = node;
     }
@@ -148,7 +200,6 @@ public class EntityCapsManager {
     }
 
     private void notifyCapsVerListeners() {
-        // FIXME Add our own caps version to the caps manager.
         for (CapsVerListener listener : capsVerListeners) {
             listener.capsVerUpdated(currentCapsVersion);
         }
@@ -193,7 +244,8 @@ public class EntityCapsManager {
         return s;
     }
 
-    void calculateEntityCapsVersion(String identityType,
+    void calculateEntityCapsVersion(DiscoverInfo discoverInfo,
+            String identityType,
             String identityName, List<String> features,
             DataForm extendedInfo) {
         String s = "";
@@ -248,7 +300,18 @@ public class EntityCapsManager {
             }
         }
 
-        currentCapsVersion = capsToHash(s);
+
+        setCurrentCapsVersion(discoverInfo, capsToHash(s));
+    }
+
+    /**
+     * Set our own caps version.
+     *
+     * @param capsVersion the new caps version
+     */
+    public void setCurrentCapsVersion(DiscoverInfo discoverInfo, String capsVersion) {
+        currentCapsVersion = capsVersion;
+        addDiscoverInfoByNode(getNode() + "#" + capsVersion, discoverInfo);
         notifyCapsVerListeners();
     }
 
