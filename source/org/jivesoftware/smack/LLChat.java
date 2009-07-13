@@ -81,6 +81,12 @@ public class LLChat {
         service.sendMessage(message);
     }
 
+    public Message generateMessage(String text) {
+        Message message = new Message(serviceName, Message.Type.chat);
+        message.setBody(text);
+        return message;
+    }
+
     /**
      * Send a message to the remote client.
      *
@@ -88,10 +94,7 @@ public class LLChat {
      * @throws XMPPException if an exception occurs during transmission.
      */
     public void sendMessage(String text) throws XMPPException {
-        Message message = new Message(serviceName, Message.Type.chat);
-        message.setBody(text);
-
-        service.sendMessage(message);
+        service.sendMessage(generateMessage(text));
     }
 
     /**
