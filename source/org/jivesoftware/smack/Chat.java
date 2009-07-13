@@ -78,6 +78,19 @@ public class Chat {
     }
 
     /**
+     * Generate a message including setting recipient, type and  body.
+     *
+     * @param text the body
+     * @return the new message
+     */
+    public Message generateMessage(String text) {
+        Message message = new Message(participant, Message.Type.chat);
+        message.setThread(threadID);
+        message.setBody(text);
+        return message;
+    }
+
+    /**
      * Sends the specified text as a message to the other chat participant.
      * This is a convenience method for:
      *
@@ -91,10 +104,7 @@ public class Chat {
      * @throws XMPPException if sending the message fails.
      */
     public void sendMessage(String text) throws XMPPException {
-        Message message = new Message(participant, Message.Type.chat);
-        message.setThread(threadID);
-        message.setBody(text);
-        chatManager.sendMessage(this, message);
+        chatManager.sendMessage(this, generateMessage(text));
     }
 
     /**
