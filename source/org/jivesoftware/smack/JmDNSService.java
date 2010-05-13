@@ -25,6 +25,7 @@ import javax.jmdns.impl.JmDNSImpl;
 import javax.jmdns.impl.DNSCache;
 import javax.jmdns.impl.DNSEntry;
 
+import java.util.Collection;
 import java.util.LinkedList;
 import java.net.InetAddress;
 import java.io.IOException;
@@ -121,7 +122,7 @@ public class JmDNSService extends LLService implements ServiceNameListener {
                 ht.put(t.a, t.b);
         }
         serviceInfo = ServiceInfo.create(SERVICE_TYPE,
-                presence.getServiceName(), presence.getPort(), 0, 0, ht);
+                presence.getServiceName(), presence.getPort(), 0, 0, true, ht);
         serviceInfo.addServiceNameListener(this);
 
         try {
@@ -133,21 +134,13 @@ public class JmDNSService extends LLService implements ServiceNameListener {
                 // Update presence service name
                 // Name collision occured, lets remove confusing elements
                 // from cache in case something goes wrong
-                JmDNSImpl jmdnsimpl = (JmDNSImpl) jmdns;
-                DNSCache.CacheNode n = jmdnsimpl.getCache().find(originalName);
+                JmDNSImpl jmdnsimpl = (JmDNSImpl)jmdns;
 
-                LinkedList<DNSEntry> toRemove = new LinkedList<DNSEntry>();
-                while (n != null) {
-                    DNSEntry e = n.getValue();
-                    if (e != null)
-                        toRemove.add(e);
-
-                    n = n.next();
-                }
+                Collection<? extends DNSEntry> toRemove = jmdnsimpl.getCache().getDNSEntryList(originalName);
 
                 // Remove the DNSEntry's one by one
                 for (DNSEntry e : toRemove) {
-                    jmdnsimpl.getCache().remove(e);
+                    jmdnsimpl.getCache().removeDNSEntry(e);
                 }
             }
         }
@@ -160,12 +153,12 @@ public class JmDNSService extends LLService implements ServiceNameListener {
      * Reregister the DNS-SD service with the daemon.
      */
     protected void reannounceService() throws XMPPException {
-        try {
+        /*try {
             jmdns.reannounceService(serviceInfo);
         }
         catch (IOException ioe) {
             throw new XMPPException("Exception occured when reannouncing mDNS presence.", ioe);
-        }
+        }*/
     }
 
     public void serviceNameChanged(String newName, String oldName) {
